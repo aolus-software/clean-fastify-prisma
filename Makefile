@@ -78,7 +78,10 @@ db-generate:
 	bun run db:generate
 
 db-migrate:
-	bun run db:migrate
+	bun run db:migrate:deploy
+
+db-migrate-dev:
+	bun run db:migrate:dev
 
 db-push:
 	bun run db:push

@@ -37,7 +37,7 @@ export default function (fastify: FastifyInstance) {
 				{
 					AppName: AppConfig.APP_NAME,
 					AppTimezone: AppConfig.APP_TIMEZONE,
-					AppEnvironment: AppConfig.APP_ENV,
+					AppEnvironment: AppConfig.NODE_ENV,
 					CurrentTime: DateToolkit.getDateTimeInformativeWithTimezone(DateToolkit.now()),
 				},
 				"API is running successfully.",

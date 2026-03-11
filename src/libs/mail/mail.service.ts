@@ -37,8 +37,8 @@ export const EmailService = {
 			}
 		}
 
-		if (AppConfig.APP_ENV !== "production") {
-			options.subject = `[${AppConfig.APP_ENV.toUpperCase()}] ${options.subject}`;
+		if (AppConfig.NODE_ENV !== "production") {
+			options.subject = `[${AppConfig.NODE_ENV.toUpperCase()}] ${options.subject}`;
 		}
 
 		const mailOptions = {

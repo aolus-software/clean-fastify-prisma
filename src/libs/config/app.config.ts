@@ -4,7 +4,7 @@ const env = cleanEnv(process.env, {
 	APP_NAME: str({ default: "Fastify Prisma App" }),
 	APP_PORT: num({ default: 3000 }),
 	APP_URL: url({ default: "http://localhost:3000" }),
-	APP_ENV: str({
+	NODE_ENV: str({
 		default: "development",
 		choices: ["development", "staging", "production"],
 	}),
@@ -22,7 +22,7 @@ interface IAppConfig {
 	APP_NAME: string;
 	APP_PORT: number;
 	APP_URL: string;
-	APP_ENV: "development" | "staging" | "production";
+	NODE_ENV: "development" | "staging" | "production";
 	APP_TIMEZONE: string;
 	APP_KEY: string;
 	APP_JWT_SECRET: string;
@@ -37,7 +37,7 @@ export const AppConfig: IAppConfig = {
 	APP_NAME: env.APP_NAME,
 	APP_PORT: env.APP_PORT,
 	APP_URL: env.APP_URL,
-	APP_ENV: env.APP_ENV,
+	NODE_ENV: env.NODE_ENV,
 	APP_TIMEZONE: env.APP_TIMEZONE,
 	APP_KEY: env.APP_KEY,
 	APP_JWT_SECRET: env.APP_JWT_SECRET,

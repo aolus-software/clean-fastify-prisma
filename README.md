@@ -180,7 +180,7 @@ The application uses JWT-based authentication:
 | ---------------- | ---------------------------- | ----------- |
 | `APP_PORT`       | Server port                  | 8001        |
 | `APP_HOST`       | Server host                  | localhost   |
-| `APP_ENV`        | Environment                  | development |
+| `NODE_ENV`       | Environment                  | development |
 | `DATABASE_URL`   | PostgreSQL connection string | -           |
 | `REDIS_HOST`     | Redis host                   | localhost   |
 | `REDIS_PORT`     | Redis port                   | 6379        |
