@@ -12,9 +12,7 @@ export const UserResponseSchema = z.object({
 });
 
 export const UserDetailResponseSchema = UserResponseSchema.extend({
-	roles: z
-		.array(z.object({ id: z.string().uuid(), name: z.string() }))
-		.nullable(),
+	roles: z.array(z.object({ id: z.string().uuid(), name: z.string() })).nullable(),
 	remark: z.string().nullable(),
 });
 

@@ -29,17 +29,11 @@ export class DateToolkit {
 	}
 
 	static tomorrow(): dayjs.Dayjs {
-		return dayjs()
-			.tz(DateToolkit._configuredTimezone)
-			.add(1, "day")
-			.startOf("day");
+		return dayjs().tz(DateToolkit._configuredTimezone).add(1, "day").startOf("day");
 	}
 
 	static yesterday(): dayjs.Dayjs {
-		return dayjs()
-			.tz(DateToolkit._configuredTimezone)
-			.subtract(1, "day")
-			.startOf("day");
+		return dayjs().tz(DateToolkit._configuredTimezone).subtract(1, "day").startOf("day");
 	}
 
 	static parse(dateString: string): dayjs.Dayjs {
@@ -133,15 +127,10 @@ export class DateToolkit {
 	static isYesterday(date: dayjs.Dayjs): boolean {
 		return date
 			.tz(DateToolkit._configuredTimezone)
-			.isSame(
-				dayjs().tz(DateToolkit._configuredTimezone).subtract(1, "day"),
-				"day",
-			);
+			.isSame(dayjs().tz(DateToolkit._configuredTimezone).subtract(1, "day"), "day");
 	}
 
-	static isValid(
-		date: string | number | dayjs.Dayjs | Date | null | undefined,
-	): boolean {
+	static isValid(date: string | number | dayjs.Dayjs | Date | null | undefined): boolean {
 		return dayjs(date).isValid();
 	}
 
@@ -186,15 +175,11 @@ export class DateToolkit {
 	}
 
 	static getDateInformative(date: dayjs.Dayjs): string {
-		return date
-			.tz(DateToolkit._configuredTimezone)
-			.format("dddd, MMMM D, YYYY");
+		return date.tz(DateToolkit._configuredTimezone).format("dddd, MMMM D, YYYY");
 	}
 
 	static getDateTimeInformative(date: dayjs.Dayjs): string {
-		return date
-			.tz(DateToolkit._configuredTimezone)
-			.format("dddd, MMMM D, YYYY HH:mm");
+		return date.tz(DateToolkit._configuredTimezone).format("dddd, MMMM D, YYYY HH:mm");
 	}
 
 	// These methods already accept timezone as a parameter, so we keep them as is
@@ -210,10 +195,7 @@ export class DateToolkit {
 		return date.tz(tz).format("dddd, MMMM D, YYYY z");
 	}
 
-	static getDateTimeInformativeWithTimezone(
-		date: dayjs.Dayjs,
-		tz?: string,
-	): string {
+	static getDateTimeInformativeWithTimezone(date: dayjs.Dayjs, tz?: string): string {
 		if (!tz) {
 			tz = DateToolkit.getConfiguredTimezone();
 		}

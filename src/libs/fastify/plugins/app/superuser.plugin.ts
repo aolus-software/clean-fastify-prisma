@@ -15,9 +15,7 @@ function requireSuperuser(this: FastifyRequest, reply: FastifyReply) {
 	}
 
 	if (!userInformation.roles.some((role) => role === "superuser")) {
-		reply
-			.status(403)
-			.send({ message: "Access denied. Superuser role required." });
+		reply.status(403).send({ message: "Access denied. Superuser role required." });
 		return;
 	}
 }

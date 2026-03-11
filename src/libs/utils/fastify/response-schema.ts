@@ -36,9 +36,10 @@ export function createSuccessPaginationResponseSchema<T extends ZodTypeAny>(
 	});
 }
 
-export function createSuccessKeySetPaginationResponseSchema<
-	T extends ZodTypeAny,
->(dataSchema: T, statusCode: number = 200) {
+export function createSuccessKeySetPaginationResponseSchema<T extends ZodTypeAny>(
+	dataSchema: T,
+	statusCode: number = 200,
+) {
 	return z.object({
 		status: z.number().default(statusCode).describe("HTTP status code"),
 		success: z.boolean().default(true).describe("Request success"),
@@ -50,10 +51,7 @@ export function createSuccessKeySetPaginationResponseSchema<
 				limit: z.number().describe("Number of items per page"),
 				totalCount: z.number().describe("Total number of items"),
 				nextCursor: z.string().nullable().describe("Cursor for the next page"),
-				previousCursor: z
-					.string()
-					.nullable()
-					.describe("Cursor for the previous page"),
+				previousCursor: z.string().nullable().describe("Cursor for the previous page"),
 			}),
 		}),
 	});
@@ -76,26 +74,15 @@ export function buildDatatableQueryParamsSchema(
 
 	return z.object({
 		page: z.coerce.number().min(1).default(1).describe("Page number"),
-		limit: z.coerce
-			.number()
-			.min(1)
-			.max(100)
-			.default(10)
-			.describe("Items per page"),
+		limit: z.coerce.number().min(1).max(100).default(10).describe("Items per page"),
 		search: z.string().optional().describe("Search query"),
 		sort: z
 			.string()
 			.default("created_at")
 			.describe(
-				"Sort field" +
-					(allowableSort.length
-						? ` (allowed: ${allowableSort.join(", ")})`
-						: ""),
+				"Sort field" + (allowableSort.length ? ` (allowed: ${allowableSort.join(", ")})` : ""),
 			),
-		sortDirection: z
-			.enum(["asc", "desc"])
-			.default("desc")
-			.describe("Sort direction"),
+		sortDirection: z.enum(["asc", "desc"]).default("desc").describe("Sort direction"),
 		"filter[*]": filterSchema.optional().describe("Filter conditions"),
 	});
 }
@@ -121,12 +108,7 @@ export function createValidationErrorResponseSchema() {
 		success: z.boolean().default(false).describe("Request success"),
 		message: z.string().describe("Error message"),
 		errors: z
-			.array(
-				z.record(
-					z.string().describe("Field name"),
-					z.string().describe("Error message"),
-				),
-			)
+			.array(z.record(z.string().describe("Field name"), z.string().describe("Error message")))
 			.describe("Validation errors"),
 	});
 }
@@ -135,12 +117,9 @@ export function createValidationErrorResponseSchema() {
 export const UnauthorizedResponseSchema = createErrorResponseSchema(401);
 export const ForbiddenResponseSchema = createErrorResponseSchema(403);
 export const NotFoundResponseSchema = createErrorResponseSchema(404);
-export const ValidationErrorResponseSchema =
-	createValidationErrorResponseSchema();
+export const ValidationErrorResponseSchema = createValidationErrorResponseSchema();
 export const ServerErrorResponseSchema = createErrorResponseSchema(500);
 export const BadRequestResponseSchema = createErrorResponseSchema(400);
 
 // Empty data success response helper
-export const EmptySuccessResponseSchema = createSuccessResponseSchema(
-	z.object({}),
-);
+export const EmptySuccessResponseSchema = createSuccessResponseSchema(z.object({}));

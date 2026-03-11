@@ -15,10 +15,7 @@ export const UpdateProfileBodySchema = z.object({
 
 export const UpdatePasswordBodySchema = z.object({
 	currentPassword: z.string().describe("Current password"),
-	password: z
-		.string()
-		.regex(StrongPassword)
-		.describe("New password (must be strong)"),
+	password: z.string().regex(StrongPassword).describe("New password (must be strong)"),
 });
 
 export const ProfileResponseSchema = createSuccessResponseSchema(
@@ -40,8 +37,4 @@ export const ProfileResponseSchema = createSuccessResponseSchema(
 
 export const SuccessResponseSchema = createSuccessResponseSchema(z.object({}));
 
-export {
-	ServerErrorResponseSchema,
-	UnauthorizedResponseSchema,
-	ValidationErrorResponseSchema,
-};
+export { ServerErrorResponseSchema, UnauthorizedResponseSchema, ValidationErrorResponseSchema };

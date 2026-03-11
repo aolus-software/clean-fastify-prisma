@@ -9,9 +9,7 @@ export class DatatableToolkit {
 		const query = request.query as Record<string, string>;
 
 		const page: number = query.page ? parseInt(query.page, 10) : 1;
-		const perPage: number = query.perPage
-			? parseInt(query.perPage, 10)
-			: paginationLength;
+		const perPage: number = query.perPage ? parseInt(query.perPage, 10) : paginationLength;
 		const search: string | null = query.search ? query.search : null;
 		const orderBy: string = query.sort ? query.sort : defaultSort;
 		const orderDirection: SortDirection = query.sortDirection

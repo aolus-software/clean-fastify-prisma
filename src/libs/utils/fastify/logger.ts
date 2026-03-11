@@ -61,10 +61,7 @@ const isTokenLikeString = (val: unknown): boolean => {
 	return false;
 };
 
-const redactSensitive = (
-	obj: unknown,
-	sensitiveKeysLower: string[],
-): unknown => {
+const redactSensitive = (obj: unknown, sensitiveKeysLower: string[]): unknown => {
 	if (obj === null || typeof obj !== "object") return obj;
 
 	if (Array.isArray(obj)) {
@@ -79,10 +76,7 @@ const redactSensitive = (
 		const value = result[key];
 		const keyLower = key.toLowerCase();
 
-		if (
-			sensitiveKeysLower.some((k) => keyLower.includes(k)) ||
-			isTokenLikeString(value)
-		) {
+		if (sensitiveKeysLower.some((k) => keyLower.includes(k)) || isTokenLikeString(value)) {
 			result[key] = "***REDACTED***";
 		} else if (isPlainObject(value) || Array.isArray(value)) {
 			result[key] = redactSensitive(value, sensitiveKeysLower);
@@ -94,9 +88,7 @@ const redactSensitive = (
 	return result;
 };
 
-export const createLoggerConfig = (
-	options: LoggerOptions = {},
-): pino.LoggerOptions => {
+export const createLoggerConfig = (options: LoggerOptions = {}): pino.LoggerOptions => {
 	const {
 		level = "info",
 		destination = "./storage/logs/app.log",
@@ -125,8 +117,7 @@ export const createLoggerConfig = (
 				};
 			},
 		},
-		timestamp: () =>
-			`,"time":"${DateToolkit.getDateTimeInformative(DateToolkit.now())}"`,
+		timestamp: () => `,"time":"${DateToolkit.getDateTimeInformative(DateToolkit.now())}"`,
 		redact: {
 			paths: defaultSensitiveKeys,
 			// censor: "***REDACTED***",
@@ -134,11 +125,7 @@ export const createLoggerConfig = (
 		},
 		hooks: {
 			logMethod(args, method) {
-				if (
-					args.length > 0 &&
-					typeof args[0] === "object" &&
-					args[0] !== null
-				) {
+				if (args.length > 0 && typeof args[0] === "object" && args[0] !== null) {
 					args[0] = redactSensitive(args[0], sensitiveKeysLower);
 				}
 				return method.apply(this, args);

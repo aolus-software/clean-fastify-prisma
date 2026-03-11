@@ -12,6 +12,7 @@ export default tseslint.config(
 			"eslint.config.mjs",
 			"dist/**/*",
 			"prisma/generated/**/*",
+			".agents/**/*",
 			"**/*.interface.ts",
 			"**/interface/**/*",
 			"**/interfaces/**/*",
@@ -52,11 +53,7 @@ export default tseslint.config(
 			"@typescript-eslint/no-unsafe-return": "warn",
 
 			"linebreak-style": ["error", "unix"],
-			quotes: [
-				"error",
-				"double",
-				{ avoidEscape: true, allowTemplateLiterals: true },
-			],
+			quotes: ["error", "double", { avoidEscape: true, allowTemplateLiterals: true }],
 			semi: ["error", "always"],
 
 			"simple-import-sort/imports": "error",

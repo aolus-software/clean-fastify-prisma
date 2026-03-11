@@ -18,8 +18,7 @@ export default fp(
 							type: "http",
 							scheme: "bearer",
 							bearerFormat: "JWT",
-							description:
-								"Enter your JWT token in the format **Bearer &lt;token>**",
+							description: "Enter your JWT token in the format **Bearer &lt;token>**",
 						},
 					},
 				},

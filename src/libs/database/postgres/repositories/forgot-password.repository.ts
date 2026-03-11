@@ -17,7 +17,7 @@ export function ForgotPasswordRepository(tx?: TransactionClient) {
 		async findByToken(
 			token: string,
 		): Promise<{ id: string; user_id: string; created_at: Date } | null> {
-			return dbClient.passwordResetToken.findFirst({
+			return await dbClient.passwordResetToken.findFirst({
 				where: { token },
 				select: { id: true, user_id: true, created_at: true },
 			});

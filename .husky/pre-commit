@@ -1,0 +1,4 @@
+bun run format
+bun run lint:fix
+bun run build
+bunx --bun prisma migrate deploy

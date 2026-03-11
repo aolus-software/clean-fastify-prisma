@@ -71,8 +71,4 @@ export const RefreshTokenResponseSchema = createSuccessResponseSchema(
 
 export const SuccessResponseSchema = createSuccessResponseSchema(z.object({}));
 
-export {
-	ServerErrorResponseSchema,
-	UnauthorizedResponseSchema,
-	ValidationErrorResponseSchema,
-};
+export { ServerErrorResponseSchema, UnauthorizedResponseSchema, ValidationErrorResponseSchema };

@@ -20,12 +20,7 @@ async function authenticate(this: FastifyRequest, reply: FastifyReply) {
 
 		if (!cacheUser) {
 			const userInfo = await UserRepository().findUserInformation(userJwt.id);
-			await this.server.redis.set(
-				cacheKey,
-				JSON.stringify(userInfo),
-				"EX",
-				3600 * 24,
-			);
+			await this.server.redis.set(cacheKey, JSON.stringify(userInfo), "EX", 3600 * 24);
 			this.userInformation = userInfo as UserInformation;
 		} else {
 			this.userInformation = JSON.parse(cacheUser) as UserInformation;

@@ -1,0 +1,30 @@
+{
+	"version": 1,
+	"skills": {
+		"fastify-best-practices": {
+			"source": "mcollina/skills",
+			"sourceType": "github",
+			"computedHash": "c5e2b33d8e41e8a24eeed4c42918ddf6b81e8c49d37bb87d1e8a5962b67b8f85"
+		},
+		"fastify-plugin": {
+			"source": "janisto/fastify-playground",
+			"sourceType": "github",
+			"computedHash": "e690f3bb4c1390d2eef72fa34c33b5158a8a54ce761a14aeb8b9ee2cbe8bcec4"
+		},
+		"fastify-routes": {
+			"source": "janisto/fastify-playground",
+			"sourceType": "github",
+			"computedHash": "1894b7d5591a8461fb28e639980046885c4ab68ce7be877eeeaee925bdb9c9a4"
+		},
+		"mastering-typescript": {
+			"source": "spillwavesolutions/mastering-typescript-skill",
+			"sourceType": "github",
+			"computedHash": "1cba0ac27ae3ceb517b93bb6ccf053607b8ba939a1c1c9d4716eed7e4d9175b2"
+		},
+		"prisma-expert": {
+			"source": "sickn33/antigravity-awesome-skills",
+			"sourceType": "github",
+			"computedHash": "1f638daa21876d30497d5474c55fa3c67044708f03554093c6f4cc9a7dd5bc33"
+		}
+	}
+}

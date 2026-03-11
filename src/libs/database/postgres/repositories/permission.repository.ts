@@ -1,10 +1,10 @@
 import type { Prisma } from "@prisma-generated";
 
-import { db } from "../client";
 import type {
 	PermissionList,
 	PermissionSelectOptions,
 } from "../../../types/repositories/permission";
+import { db } from "../client";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -53,10 +53,8 @@ export function PermissionRepository(tx?: TransactionClient) {
 			return { data: permissions, total };
 		},
 
-		async findById(
-			id: string,
-		): Promise<{ id: string; name: string; group: string } | null> {
-			return dbClient.permission.findUnique({
+		async findById(id: string): Promise<{ id: string; name: string; group: string } | null> {
+			return await dbClient.permission.findUnique({
 				where: { id },
 				select: { id: true, name: true, group: true },
 			});
@@ -92,10 +90,7 @@ export function PermissionRepository(tx?: TransactionClient) {
 				select: { id: true, name: true, group: true },
 			});
 
-			const groupedMap = new Map<
-				string,
-				{ id: string; name: string; group: string }[]
-			>();
+			const groupedMap = new Map<string, { id: string; name: string; group: string }[]>();
 
 			for (const permission of permissions) {
 				if (!groupedMap.has(permission.group)) {

@@ -35,11 +35,7 @@ export default function (fastify: FastifyInstance) {
 			request.requireSuperuser(reply);
 			const permissions = await PermissionRepository().getSelectOptions();
 
-			return ResponseToolkit.success(
-				reply,
-				permissions,
-				"Permission select options fetched",
-			);
+			return ResponseToolkit.success(reply, permissions, "Permission select options fetched");
 		},
 	);
 

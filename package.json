@@ -18,14 +18,16 @@
 		"lint:fix": "bun run eslint . --ext .ts,.js --fix",
 		"format": "bun run prettier --write .",
 		"typecheck": "bun run tsc --noEmit",
-		"prepare": "husky install",
+		"prepare": "husky",
 		"db:generate": "prisma generate",
 		"db:migrate": "prisma migrate dev",
 		"db:push": "prisma db push",
 		"db:pull": "prisma db pull",
 		"db:studio": "prisma studio",
 		"db:reset": "prisma migrate reset",
-		"db:seed": "bun run prisma/seed/index.ts"
+		"db:seed": "bun run prisma/seed/index.ts",
+		"db:clickhouse:migrate": "bun run src/libs/database/clickhouse/scripts/migrate.ts migrate",
+		"db:clickhouse:status": "bun run src/libs/database/clickhouse/scripts/migrate.ts status"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -53,6 +55,7 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
+		"@clickhouse/client": "^1.16.0",
 		"@fastify/autoload": "^6.3.1",
 		"@fastify/cors": "^11.2.0",
 		"@fastify/helmet": "^13.0.2",

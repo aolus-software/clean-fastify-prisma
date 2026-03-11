@@ -1,12 +1,6 @@
 import { db, RoleRepository, type TransactionClient, UserRepository } from "@database";
 import { injectable, UnprocessableEntityError } from "@fastify-libs";
-import {
-	DatatableType,
-	PaginationResponse,
-	UserDetail,
-	UserList,
-	UserStatusEnum,
-} from "@types";
+import { DatatableType, PaginationResponse, UserDetail, UserList, UserStatusEnum } from "@types";
 import { Hash } from "@utils";
 
 @injectable()

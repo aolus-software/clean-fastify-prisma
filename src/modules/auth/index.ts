@@ -259,10 +259,7 @@ export default function (fastify: FastifyInstance) {
 					},
 				);
 
-				await authService.storeRefreshToken(
-					(decoded as { id: string }).id,
-					newRefreshToken,
-				);
+				await authService.storeRefreshToken((decoded as { id: string }).id, newRefreshToken);
 
 				return ResponseToolkit.success<{
 					accessToken: string;

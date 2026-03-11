@@ -43,7 +43,11 @@ export default function (fastify: FastifyInstance) {
 			},
 		},
 		async (_request, reply) => {
-			type ServiceStatus = { status: "healthy" | "unhealthy"; responseTime: number; remarks: string };
+			type ServiceStatus = {
+				status: "healthy" | "unhealthy";
+				responseTime: number;
+				remarks: string;
+			};
 			const serviceStatus: { database: ServiceStatus; redis: ServiceStatus } = {
 				database: {
 					status: "healthy",

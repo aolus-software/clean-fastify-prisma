@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma-generated";
 
-import { db } from "../client";
 import type { RoleDetail, RoleList } from "../../../types/repositories/role";
+import { db } from "../client";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -70,9 +70,7 @@ export function RoleRepository(tx?: TransactionClient) {
 			});
 
 			const assignedIds = new Set(
-				assignedPermissionIds.map(
-					(rp: { permission_id: string }) => rp.permission_id,
-				),
+				assignedPermissionIds.map((rp: { permission_id: string }) => rp.permission_id),
 			);
 
 			const groupedPermissions = new Map<
@@ -91,9 +89,10 @@ export function RoleRepository(tx?: TransactionClient) {
 				});
 			}
 
-			const permissions = Array.from(groupedPermissions.entries()).map(
-				([group, names]) => ({ group, names }),
-			);
+			const permissions = Array.from(groupedPermissions.entries()).map(([group, names]) => ({
+				group,
+				names,
+			}));
 
 			return {
 				id: role.id,
@@ -122,10 +121,7 @@ export function RoleRepository(tx?: TransactionClient) {
 			return role.id;
 		},
 
-		async update(
-			id: string,
-			data: { name?: string; permission_ids?: string[] },
-		): Promise<void> {
+		async update(id: string, data: { name?: string; permission_ids?: string[] }): Promise<void> {
 			const { name, permission_ids } = data;
 
 			const executeUpdate = async (client: typeof dbClient) => {
@@ -168,7 +164,7 @@ export function RoleRepository(tx?: TransactionClient) {
 		},
 
 		async getSelectOptions(): Promise<{ id: string; name: string }[]> {
-			return dbClient.role.findMany({
+			return await dbClient.role.findMany({
 				orderBy: { name: "asc" },
 				select: { id: true, name: true },
 			});

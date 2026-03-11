@@ -1,11 +1,6 @@
 import { db, PermissionRepository, RoleRepository, type TransactionClient } from "@database";
 import { injectable, UnprocessableEntityError } from "@fastify-libs";
-import {
-	DatatableType,
-	PaginationResponse,
-	RoleDetail,
-	RoleList,
-} from "@types";
+import { DatatableType, PaginationResponse, RoleDetail, RoleList } from "@types";
 
 @injectable()
 export class RoleService {
@@ -61,10 +56,7 @@ export class RoleService {
 		return role;
 	}
 
-	async update(
-		id: string,
-		data: { name?: string; permission_ids?: string[] },
-	): Promise<void> {
+	async update(id: string, data: { name?: string; permission_ids?: string[] }): Promise<void> {
 		await db.$transaction(async (tx: TransactionClient) => {
 			await RoleRepository(tx).update(id, data);
 		});

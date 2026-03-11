@@ -24,19 +24,12 @@ export const EmailService = {
 
 		if (options.template) {
 			try {
-				const templatePath = path.join(
-					__dirname,
-					"templates",
-					`${options.template}.html`,
-				);
+				const templatePath = path.join(__dirname, "templates", `${options.template}.html`);
 				htmlContent = fs.readFileSync(templatePath, "utf-8");
 
 				if (options.variables) {
 					Object.entries(options.variables).forEach(([key, value]) => {
-						htmlContent = htmlContent?.replace(
-							new RegExp(`{{${key}}}`, "g"),
-							value,
-						);
+						htmlContent = htmlContent?.replace(new RegExp(`{{${key}}}`, "g"), value);
 					});
 				}
 			} catch (error) {
@@ -56,16 +49,12 @@ export const EmailService = {
 			text: options.text,
 		};
 
-		logger.info(
-			`Sending email to ${options.to} with subject "${options.subject}"`,
-		);
+		logger.info(`Sending email to ${options.to} with subject "${options.subject}"`);
 
 		return await transporter
 			.sendMail({ ...mailOptions })
 			.then(() => {
-				logger.info(
-					`Email sent to ${options.to} with subject "${options.subject}"`,
-				);
+				logger.info(`Email sent to ${options.to} with subject "${options.subject}"`);
 			})
 			.catch((error) => {
 				logger.error(`Failed to send email to ${options.to}:`);

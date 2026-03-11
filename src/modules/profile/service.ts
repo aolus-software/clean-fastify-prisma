@@ -41,10 +41,7 @@ export class ProfileService {
 
 		if (!user) throw new UnauthorizedError("User not found");
 
-		const isPasswordValid = await Hash.compareHash(
-			data.currentPassword,
-			user.password,
-		);
+		const isPasswordValid = await Hash.compareHash(data.currentPassword, user.password);
 
 		if (!isPasswordValid) {
 			throw new UnprocessableEntityError("Validation error", [

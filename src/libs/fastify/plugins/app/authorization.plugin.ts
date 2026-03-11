@@ -8,11 +8,7 @@ declare module "fastify" {
 	}
 }
 
-function requireRoles(
-	this: FastifyRequest,
-	roles: string[],
-	reply: FastifyReply,
-) {
+function requireRoles(this: FastifyRequest, roles: string[], reply: FastifyReply) {
 	const userInformation = this.userInformation;
 	if (!userInformation) {
 		reply.status(401).send({ message: "Unauthorized" });
@@ -23,22 +19,14 @@ function requireRoles(
 		return;
 	}
 
-	const hasRequiredRole = roles.some((role) =>
-		userInformation.roles.includes(role),
-	);
+	const hasRequiredRole = roles.some((role) => userInformation.roles.includes(role));
 	if (!hasRequiredRole) {
-		reply
-			.status(403)
-			.send({ message: "Access denied. Required role(s) missing." });
+		reply.status(403).send({ message: "Access denied. Required role(s) missing." });
 		return;
 	}
 }
 
-function requirePermissions(
-	this: FastifyRequest,
-	permissions: string[],
-	reply: FastifyReply,
-) {
+function requirePermissions(this: FastifyRequest, permissions: string[], reply: FastifyReply) {
 	const userInformation = this.userInformation;
 	if (!userInformation) {
 		reply.status(401).send({ message: "Unauthorized" });
@@ -53,9 +41,7 @@ function requirePermissions(
 		userInformation.permissions.map((perm) => perm.name).includes(permission),
 	);
 	if (!hasRequiredPermission) {
-		reply
-			.status(403)
-			.send({ message: "Access denied. Required permission(s) missing." });
+		reply.status(403).send({ message: "Access denied. Required permission(s) missing." });
 		return;
 	}
 }

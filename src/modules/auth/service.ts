@@ -7,11 +7,7 @@ import {
 	type TransactionClient,
 	UserRepository,
 } from "@database";
-import {
-	injectable,
-	UnprocessableEntityError,
-	verificationTokenLifetime,
-} from "@fastify-libs";
+import { injectable, UnprocessableEntityError, verificationTokenLifetime } from "@fastify-libs";
 import { UserInformation } from "@types";
 import { Hash, StrToolkit } from "@utils";
 
@@ -58,11 +54,7 @@ export class AuthService {
 		return userInfo;
 	}
 
-	async register(payload: {
-		name: string;
-		email: string;
-		password: string;
-	}): Promise<void> {
+	async register(payload: { name: string; email: string; password: string }): Promise<void> {
 		const emailExists = await UserRepository().emailExists(payload.email);
 		if (emailExists) {
 			throw new UnprocessableEntityError("Email already in use", [
@@ -81,11 +73,7 @@ export class AuthService {
 			});
 
 			const token = StrToolkit.random(255);
-			await EmailVerificationRepository(tx).create(
-				userId,
-				token,
-				verificationTokenLifetime,
-			);
+			await EmailVerificationRepository(tx).create(userId, token, verificationTokenLifetime);
 
 			await sendEmailQueue.add("send-email", {
 				subject: "Email verification",
@@ -113,11 +101,7 @@ export class AuthService {
 
 		const token = StrToolkit.random(255);
 		await db.$transaction(async (tx: TransactionClient) => {
-			await EmailVerificationRepository(tx).create(
-				user.id,
-				token,
-				verificationTokenLifetime,
-			);
+			await EmailVerificationRepository(tx).create(user.id, token, verificationTokenLifetime);
 
 			await sendEmailQueue.add("send-email", {
 				subject: "Email verification",
@@ -191,10 +175,7 @@ export class AuthService {
 		await redis.set(key, refreshToken, "EX", AppConfig.APP_JWT_REFRESH_EXPIRES_IN);
 	}
 
-	async validateRefreshToken(
-		refreshToken: string,
-		userId: string,
-	): Promise<boolean> {
+	async validateRefreshToken(refreshToken: string, userId: string): Promise<boolean> {
 		const { RedisClient } = await import("@database");
 		const redis = RedisClient.getRedisClient();
 		const key = `refresh_token:${userId}`;

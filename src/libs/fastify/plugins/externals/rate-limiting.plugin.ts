@@ -10,10 +10,7 @@ export default fp(
 			timeWindow: "1 minute",
 			redis: fastify.redis,
 			keyGenerator: (request: FastifyRequest) => {
-				const ip =
-					request.headers["x-forwarded-for"] ||
-					request.headers["x-real-ip"] ||
-					request.ip;
+				const ip = request.headers["x-forwarded-for"] || request.headers["x-real-ip"] || request.ip;
 
 				const ips = Array.isArray(ip) ? ip.join(",") : ip;
 				return `rate-limit:${ips}`;

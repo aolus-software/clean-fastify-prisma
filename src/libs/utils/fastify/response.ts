@@ -15,12 +15,7 @@ export class ResponseToolkit {
 		});
 	}
 
-	static error<T>(
-		reply: FastifyReply,
-		message: string,
-		statusCode: number = 400,
-		data?: T,
-	) {
+	static error<T>(reply: FastifyReply, message: string, statusCode: number = 400, data?: T) {
 		return reply.status(statusCode).send({
 			status: statusCode,
 			success: false,

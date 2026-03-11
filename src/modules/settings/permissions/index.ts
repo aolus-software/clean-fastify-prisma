@@ -12,11 +12,7 @@ import {
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import {
-	CreatePermissionSchema,
-	PermissionSchema,
-	UpdatePermissionSchema,
-} from "./schema";
+import { CreatePermissionSchema, PermissionSchema, UpdatePermissionSchema } from "./schema";
 import { PermissionService } from "./service";
 
 export default function (fastify: FastifyInstance) {

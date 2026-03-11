@@ -21,9 +21,7 @@ type CorsConfigType = {
 export const corsConfig: CorsConfigType = {
 	origin: env.CORS_ORIGIN,
 	methods: env.CORS_METHODS.split(",").map((method) => method.trim()),
-	allowedHeaders: env.CORS_ALLOWED_HEADERS.split(",").map((header) =>
-		header.trim(),
-	),
+	allowedHeaders: env.CORS_ALLOWED_HEADERS.split(",").map((header) => header.trim()),
 	exposedHeaders: env.CORS_EXPOSED_HEADERS
 		? env.CORS_EXPOSED_HEADERS.split(",").map((header) => header.trim())
 		: [],

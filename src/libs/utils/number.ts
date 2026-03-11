@@ -13,11 +13,7 @@ export class NumberToolkit {
 		return Math.min(Math.max(value, min), max);
 	}
 
-	static currency(
-		amount: number,
-		currencySymbol: string = "$",
-		decimals: number = 2,
-	): string {
+	static currency(amount: number, currencySymbol: string = "$", decimals: number = 2): string {
 		return `${currencySymbol}${amount.toFixed(decimals)}`;
 	}
 
@@ -29,9 +25,7 @@ export class NumberToolkit {
 		const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
 		if (bytes === 0) return "0 Bytes";
 		const i = Math.floor(Math.log(bytes) / Math.log(1024));
-		return (
-			parseFloat((bytes / Math.pow(1024, i)).toFixed(decimals)) + " " + sizes[i]
-		);
+		return parseFloat((bytes / Math.pow(1024, i)).toFixed(decimals)) + " " + sizes[i];
 	}
 
 	static forHumans(number: number): string {
@@ -52,9 +46,7 @@ export class NumberToolkit {
 	static ordinal(number: number): string {
 		const suffixes = ["th", "st", "nd", "rd"];
 		const value = number % 100;
-		return (
-			number + (suffixes[(value - 20) % 10] || suffixes[value] || suffixes[0])
-		);
+		return number + (suffixes[(value - 20) % 10] || suffixes[value] || suffixes[0]);
 	}
 
 	static pairs(array: number[]): [number, number][] {

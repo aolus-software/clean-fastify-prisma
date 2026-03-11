@@ -1,6 +1,5 @@
 import type { Prisma } from "@prisma-generated";
 
-import { db } from "../client";
 import type {
 	UserCreate,
 	UserDetail,
@@ -9,6 +8,7 @@ import type {
 	UserList,
 	UserStatusEnum,
 } from "../../../types/repositories/user";
+import { db } from "../client";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -72,9 +72,7 @@ export function UserRepository(tx?: TransactionClient) {
 
 			if (!user) return null;
 
-			const roles = user.user_roles.map(
-				(ur: { role: { name: string } }) => ur.role.name,
-			);
+			const roles = user.user_roles.map((ur: { role: { name: string } }) => ur.role.name);
 
 			const permissionsMap = new Map<string, Set<string>>();
 			for (const userRole of user.user_roles) {
@@ -87,12 +85,10 @@ export function UserRepository(tx?: TransactionClient) {
 				}
 			}
 
-			const permissions = Array.from(permissionsMap.entries()).map(
-				([name, perms]) => ({
-					name,
-					permissions: Array.from(perms),
-				}),
-			);
+			const permissions = Array.from(permissionsMap.entries()).map(([name, perms]) => ({
+				name,
+				permissions: Array.from(perms),
+			}));
 
 			return {
 				id: user.id,
@@ -162,9 +158,7 @@ export function UserRepository(tx?: TransactionClient) {
 					name: user.name,
 					email: user.email,
 					status: user.status as UserStatusEnum | null,
-					roles: user.user_roles.map(
-						(ur: { role: { name: string } }) => ur.role.name,
-					),
+					roles: user.user_roles.map((ur: { role: { name: string } }) => ur.role.name),
 					created_at: user.created_at,
 					updated_at: user.updated_at,
 				}),
@@ -200,9 +194,7 @@ export function UserRepository(tx?: TransactionClient) {
 				email: user.email,
 				status: user.status as UserStatusEnum | null,
 				remark: user.remark,
-				roles: user.user_roles.map(
-					(ur: { role: { id: string; name: string } }) => ur.role,
-				),
+				roles: user.user_roles.map((ur: { role: { id: string; name: string } }) => ur.role),
 				created_at: user.created_at,
 				updated_at: user.updated_at,
 			};
