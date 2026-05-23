@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clean_fastify_prisma_test
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: bun run db:generate
+
+      - name: Run ESLint
+        run: bun run lint
+
+      - name: Check formatting
+        run: bunx --bun prettier --check .
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: bun run db:generate
+
+      - name: Run TypeScript compiler
+        run: bun run typecheck
+
+  database:
+    name: Database Check
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clean_fastify_prisma_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check Prisma schema is formatted
+        run: |
+          bunx --bun prisma format
+          if [ -n "$(git status --porcelain prisma/schema.prisma)" ]; then
+            echo "Error: prisma/schema.prisma is not formatted. Run 'bunx prisma format' and commit."
+            git diff prisma/schema.prisma
+            exit 1
+          fi
+
+      - name: Generate Prisma client
+        run: bun run db:generate
+
+      - name: Apply migrations
+        run: bun run db:migrate:deploy
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, database]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: bun run db:generate
+
+      - name: Build server and worker
+        run: bun run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
