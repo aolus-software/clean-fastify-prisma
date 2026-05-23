@@ -26,6 +26,10 @@ export function createAppInstance() {
 		secret: AppConfig.APP_JWT_SECRET,
 	});
 
+	// @fastify/redis (ioredis) is registered solely so @fastify/rate-limit can use
+	// its Redis store — that store relies on ioredis' defineCommand (Lua), which
+	// Bun's native RedisClient does not expose. Application code goes through the
+	// Cache wrapper / RedisClient (Bun native) instead of fastify.redis.
 	app.register(fastifyRedis, {
 		host: RedisConfig.REDIS_HOST,
 		port: RedisConfig.REDIS_PORT,

@@ -1,4 +1,4 @@
-import { db } from "@database";
+import { db, RedisClient } from "@database";
 import { ResponseToolkit } from "@utils";
 import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
@@ -75,7 +75,7 @@ export default function (fastify: FastifyInstance) {
 
 			try {
 				const start = Date.now();
-				await fastify.redis.ping();
+				await RedisClient.getRedisClient().ping();
 				serviceStatus.redis.responseTime = Date.now() - start;
 			} catch (error) {
 				serviceStatus.redis = {

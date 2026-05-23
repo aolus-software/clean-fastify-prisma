@@ -1,4 +1,4 @@
-import { UserInformationCacheKey } from "@cache";
+import { Cache, UserInformationCacheKey } from "@cache";
 import { UserRepository } from "@database";
 import { UserInformation } from "@types";
 import { FastifyReply, FastifyRequest } from "fastify";
@@ -16,14 +16,14 @@ async function authenticate(this: FastifyRequest, reply: FastifyReply) {
 		await this.jwtVerify();
 		const userJwt = this.user as { id: string };
 		const cacheKey = UserInformationCacheKey(userJwt.id);
-		const cacheUser = await this.server.redis.get(cacheKey);
+		const cacheUser = await Cache.get<UserInformation>(cacheKey);
 
 		if (!cacheUser) {
-			const userInfo = await UserRepository().findUserInformation(userJwt.id);
-			await this.server.redis.set(cacheKey, JSON.stringify(userInfo), "EX", 3600 * 24);
-			this.userInformation = userInfo as UserInformation;
+			const userInfo = (await UserRepository().findUserInformation(userJwt.id)) as UserInformation;
+			await Cache.set(cacheKey, userInfo, 3600 * 24);
+			this.userInformation = userInfo;
 		} else {
-			this.userInformation = JSON.parse(cacheUser) as UserInformation;
+			this.userInformation = cacheUser;
 		}
 	} catch {
 		reply.status(401).send({ message: "Unauthorized" });

@@ -1,11 +1,11 @@
 import { RedisClient } from "@database";
 import { logger } from "@utils";
-import Redis from "ioredis";
+import type { RedisClient as BunRedisClient } from "bun";
 
 class Cache {
-	private static redis: Redis | null = null;
+	private static redis: BunRedisClient | null = null;
 
-	private static getRedisClient(): Redis {
+	private static getRedisClient(): BunRedisClient {
 		if (!this.redis) {
 			this.redis = RedisClient.getRedisClient();
 		}
@@ -45,8 +45,7 @@ class Cache {
 	static async exists(key: string): Promise<boolean> {
 		try {
 			const client = this.getRedisClient();
-			const exists = await client.exists(key);
-			return exists === 1;
+			return await client.exists(key);
 		} catch (error) {
 			logger.error(error, `Error checking existence of key ${key}:`);
 			return false;
