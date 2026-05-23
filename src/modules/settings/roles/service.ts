@@ -1,5 +1,6 @@
 import { db, PermissionRepository, RoleRepository, type TransactionClient } from "@database";
 import { injectable, UnprocessableEntityError } from "@fastify-libs";
+import { t } from "@i18n";
 import { DatatableType, PaginationResponse, RoleDetail, RoleList } from "@types";
 
 @injectable()
@@ -35,8 +36,8 @@ export class RoleService {
 			const validIds = permissions.map((p) => p.id);
 			const allValid = data.permission_ids.every((id) => validIds.includes(id));
 			if (!allValid) {
-				throw new UnprocessableEntityError("Validation error", [
-					{ field: "permission_ids", message: "One or more permissions are invalid" },
+				throw new UnprocessableEntityError(t("auth.validationError"), [
+					{ field: "permission_ids", message: t("settings.roles.invalidPermissions") },
 				]);
 			}
 		}
@@ -49,8 +50,8 @@ export class RoleService {
 	async detail(roleId: string): Promise<RoleDetail> {
 		const role = await RoleRepository().findById(roleId);
 		if (!role) {
-			throw new UnprocessableEntityError("Role not found", [
-				{ field: "roleId", message: "Role not found" },
+			throw new UnprocessableEntityError(t("errors.notFound"), [
+				{ field: "roleId", message: t("errors.notFound") },
 			]);
 		}
 		return role;

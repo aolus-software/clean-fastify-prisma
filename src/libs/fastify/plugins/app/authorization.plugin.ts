@@ -1,3 +1,4 @@
+import { t } from "@i18n";
 import { FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 
@@ -11,7 +12,7 @@ declare module "fastify" {
 function requireRoles(this: FastifyRequest, roles: string[], reply: FastifyReply) {
 	const userInformation = this.userInformation;
 	if (!userInformation) {
-		reply.status(401).send({ message: "Unauthorized" });
+		reply.status(401).send({ message: t("errors.unauthorized") });
 		return;
 	}
 
@@ -21,7 +22,7 @@ function requireRoles(this: FastifyRequest, roles: string[], reply: FastifyReply
 
 	const hasRequiredRole = roles.some((role) => userInformation.roles.includes(role));
 	if (!hasRequiredRole) {
-		reply.status(403).send({ message: "Access denied. Required role(s) missing." });
+		reply.status(403).send({ message: t("auth.accessDeniedRole") });
 		return;
 	}
 }
@@ -29,7 +30,7 @@ function requireRoles(this: FastifyRequest, roles: string[], reply: FastifyReply
 function requirePermissions(this: FastifyRequest, permissions: string[], reply: FastifyReply) {
 	const userInformation = this.userInformation;
 	if (!userInformation) {
-		reply.status(401).send({ message: "Unauthorized" });
+		reply.status(401).send({ message: t("errors.unauthorized") });
 		return;
 	}
 
@@ -41,7 +42,7 @@ function requirePermissions(this: FastifyRequest, permissions: string[], reply: 
 		userInformation.permissions.map((perm) => perm.name).includes(permission),
 	);
 	if (!hasRequiredPermission) {
-		reply.status(403).send({ message: "Access denied. Required permission(s) missing." });
+		reply.status(403).send({ message: t("auth.accessDeniedPermission") });
 		return;
 	}
 }

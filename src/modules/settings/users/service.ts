@@ -1,5 +1,6 @@
 import { db, RoleRepository, type TransactionClient, UserRepository } from "@database";
 import { injectable, UnprocessableEntityError } from "@fastify-libs";
+import { t } from "@i18n";
 import { DatatableType, PaginationResponse, UserDetail, UserList, UserStatusEnum } from "@types";
 import { Hash } from "@utils";
 
@@ -34,8 +35,8 @@ export class UserService {
 	}): Promise<void> {
 		const emailExists = await UserRepository().emailExists(data.email);
 		if (emailExists) {
-			throw new UnprocessableEntityError("Validation error", [
-				{ field: "email", message: "Email already exists" },
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "email", message: t("settings.users.emailExists") },
 			]);
 		}
 
@@ -49,8 +50,8 @@ export class UserService {
 		const validIds = roles.data.map((r) => r.id);
 		const allValid = data.role_ids.every((id) => validIds.includes(id));
 		if (!allValid) {
-			throw new UnprocessableEntityError("Validation error", [
-				{ field: "role_ids", message: "One or more roles are invalid" },
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "role_ids", message: t("settings.users.invalidRoles") },
 			]);
 		}
 
@@ -66,8 +67,8 @@ export class UserService {
 	async detail(userId: string): Promise<UserDetail> {
 		const user = await UserRepository().findById(userId);
 		if (!user) {
-			throw new UnprocessableEntityError("User not found", [
-				{ field: "userId", message: "User not found" },
+			throw new UnprocessableEntityError(t("auth.userNotFound"), [
+				{ field: "userId", message: t("auth.userNotFound") },
 			]);
 		}
 		return user;
@@ -85,8 +86,8 @@ export class UserService {
 	): Promise<void> {
 		const emailExists = await UserRepository().emailExists(data.email, id);
 		if (emailExists) {
-			throw new UnprocessableEntityError("Validation error", [
-				{ field: "email", message: "Email already exists" },
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "email", message: t("settings.users.emailExists") },
 			]);
 		}
 

@@ -1,5 +1,6 @@
 import { AppConfig } from "@config";
 import { UnprocessableEntityError } from "@fastify-libs";
+import { t } from "@i18n";
 import { UserInformation } from "@types";
 import { ResponseToolkit, StrToolkit } from "@utils";
 import { FastifyInstance } from "fastify";
@@ -66,7 +67,7 @@ export default function (fastify: FastifyInstance) {
 				accessToken: string;
 				refreshToken: string;
 				user: UserInformation;
-			}>(reply, { accessToken, refreshToken, user: userInfo }, "Login successful");
+			}>(reply, { accessToken, refreshToken, user: userInfo }, t("auth.loginSuccess"));
 		},
 	);
 
@@ -95,7 +96,7 @@ export default function (fastify: FastifyInstance) {
 
 			await authService.register({ name, email, password });
 
-			return ResponseToolkit.success(reply, {}, "Registration successful", 201);
+			return ResponseToolkit.success(reply, {}, t("auth.registerSuccess"), 201);
 		},
 	);
 
@@ -119,7 +120,7 @@ export default function (fastify: FastifyInstance) {
 			const { email } = request.body as { email: string };
 			await service.resendVerification({ email });
 
-			return ResponseToolkit.success(reply, {}, "Verification email resent successfully");
+			return ResponseToolkit.success(reply, {}, t("auth.resendVerificationSent"));
 		},
 	);
 
@@ -143,7 +144,7 @@ export default function (fastify: FastifyInstance) {
 			const { token } = request.body as { token: string };
 			await service.verifyEmail({ token });
 
-			return ResponseToolkit.success(reply, {}, "Email verified successfully");
+			return ResponseToolkit.success(reply, {}, t("auth.emailVerified"));
 		},
 	);
 
@@ -167,7 +168,7 @@ export default function (fastify: FastifyInstance) {
 			const { email } = request.body as { email: string };
 			await service.forgotPassword(email);
 
-			return ResponseToolkit.success(reply, {}, "Password reset email sent successfully");
+			return ResponseToolkit.success(reply, {}, t("auth.forgotPasswordSent"));
 		},
 	);
 
@@ -194,7 +195,7 @@ export default function (fastify: FastifyInstance) {
 			};
 			await service.resetPassword(token, newPassword);
 
-			return ResponseToolkit.success(reply, {}, "Password reset successfully");
+			return ResponseToolkit.success(reply, {}, t("auth.passwordReset"));
 		},
 	);
 
@@ -227,8 +228,8 @@ export default function (fastify: FastifyInstance) {
 					"type" in decoded &&
 					decoded.type !== "refresh"
 				) {
-					throw new UnprocessableEntityError("Invalid token type", [
-						{ field: "refreshToken", message: "Invalid refresh token" },
+					throw new UnprocessableEntityError(t("auth.invalidTokenType"), [
+						{ field: "refreshToken", message: t("auth.invalidRefreshToken") },
 					]);
 				}
 
@@ -238,10 +239,10 @@ export default function (fastify: FastifyInstance) {
 				);
 
 				if (!isValid) {
-					throw new UnprocessableEntityError("Invalid refresh token", [
+					throw new UnprocessableEntityError(t("auth.invalidRefreshToken"), [
 						{
 							field: "refreshToken",
-							message: "Refresh token has been revoked or is invalid",
+							message: t("auth.refreshTokenRevoked"),
 						},
 					]);
 				}
@@ -267,16 +268,16 @@ export default function (fastify: FastifyInstance) {
 				}>(
 					reply,
 					{ accessToken: newAccessToken, refreshToken: newRefreshToken },
-					"Token refreshed successfully",
+					t("auth.tokenRefreshed"),
 				);
 			} catch (error) {
 				if (error instanceof UnprocessableEntityError) {
 					throw error;
 				}
-				throw new UnprocessableEntityError("Invalid refresh token", [
+				throw new UnprocessableEntityError(t("auth.invalidRefreshToken"), [
 					{
 						field: "refreshToken",
-						message: "Invalid or expired refresh token",
+						message: t("auth.invalidRefreshToken"),
 					},
 				]);
 			}

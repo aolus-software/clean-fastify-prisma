@@ -1,5 +1,6 @@
 import { db, UserRepository } from "@database";
 import { injectable, UnauthorizedError, UnprocessableEntityError } from "@fastify-libs";
+import { t } from "@i18n";
 import { UserInformation } from "@types";
 import { Hash } from "@utils";
 
@@ -11,8 +12,8 @@ export class ProfileService {
 	): Promise<UserInformation> {
 		const emailExists = await UserRepository().emailExists(data.email, userId);
 		if (emailExists) {
-			throw new UnprocessableEntityError("Validation error", [
-				{ field: "email", message: "Email already in use" },
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "email", message: t("auth.emailAlreadyInUse") },
 			]);
 		}
 
@@ -26,7 +27,7 @@ export class ProfileService {
 		});
 
 		const userInfo = await UserRepository().findUserInformation(userId);
-		if (!userInfo) throw new UnauthorizedError("User not found");
+		if (!userInfo) throw new UnauthorizedError(t("auth.userNotFound"));
 
 		return userInfo;
 	}
@@ -39,13 +40,13 @@ export class ProfileService {
 			where: { id: userId, deleted_at: null },
 		});
 
-		if (!user) throw new UnauthorizedError("User not found");
+		if (!user) throw new UnauthorizedError(t("auth.userNotFound"));
 
 		const isPasswordValid = await Hash.compareHash(data.currentPassword, user.password);
 
 		if (!isPasswordValid) {
-			throw new UnprocessableEntityError("Validation error", [
-				{ field: "currentPassword", message: "Current password is incorrect" },
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "currentPassword", message: t("profile.currentPasswordIncorrect") },
 			]);
 		}
 

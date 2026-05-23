@@ -1,3 +1,4 @@
+import { t } from "@i18n";
 import { UserInformation } from "@types";
 import { ResponseToolkit } from "@utils";
 import { FastifyInstance } from "fastify";
@@ -37,7 +38,7 @@ export default function (fastify: FastifyInstance) {
 			return ResponseToolkit.success<UserInformation>(
 				reply,
 				request.userInformation,
-				"Profile retrieved successfully",
+				t("profile.retrieved"),
 			);
 		},
 	);
@@ -69,11 +70,7 @@ export default function (fastify: FastifyInstance) {
 			const service = fastify.di.resolve(ProfileService);
 			const updatedUser = await service.updateProfile(userId, { name, email, remarks });
 
-			return ResponseToolkit.success<UserInformation>(
-				reply,
-				updatedUser,
-				"Profile updated successfully",
-			);
+			return ResponseToolkit.success<UserInformation>(reply, updatedUser, t("profile.updated"));
 		},
 	);
 
@@ -103,7 +100,7 @@ export default function (fastify: FastifyInstance) {
 			const service = fastify.di.resolve(ProfileService);
 			await service.updatePassword(userId, { currentPassword, password });
 
-			return ResponseToolkit.success(reply, {}, "Password updated successfully");
+			return ResponseToolkit.success(reply, {}, t("profile.passwordUpdated"));
 		},
 	);
 }
