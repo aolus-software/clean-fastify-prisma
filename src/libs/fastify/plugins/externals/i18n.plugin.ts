@@ -1,17 +1,28 @@
-import fastifyI18n from "fastify-i18n";
+import { enterLocale, Locale, parseAcceptLanguage } from "@i18n";
 import fp from "fastify-plugin";
-import path from "path";
+
+declare module "fastify" {
+	interface FastifyRequest {
+		locale: Locale;
+	}
+}
 
 export default fp(
+	// eslint-disable-next-line @typescript-eslint/require-await
 	async function (fastify) {
-		// Register fastify-i18n plugin with basic configuration
-		await fastify.register(fastifyI18n, {
-			localeDir: path.resolve(__dirname, "../../../locales"), // Resolve to src/locales
-			defaultLocale: "en",
-			fallbackLocale: "en",
-			// Optional: expose a simple translate helper on request
-			// The plugin already decorates request with `request.t(key, ...args)`
+		fastify.decorateRequest("locale", "en");
+
+		fastify.addHook("onRequest", (request, _reply, done) => {
+			const locale = parseAcceptLanguage(request.headers["accept-language"]);
+			request.locale = locale;
+			enterLocale(locale);
+			done();
+		});
+
+		fastify.addHook("onSend", (request, reply, payload, done) => {
+			reply.header("Content-Language", request.locale);
+			done(null, payload);
 		});
 	},
-	{ name: "i18n-plugin", dependencies: [] },
+	{ name: "i18n-plugin" },
 );

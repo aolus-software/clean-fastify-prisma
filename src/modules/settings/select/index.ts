@@ -1,4 +1,5 @@
 import { PermissionRepository, RoleRepository } from "@database";
+import { t } from "@i18n";
 import {
 	createSuccessResponseSchema,
 	ForbiddenResponseSchema,
@@ -35,7 +36,7 @@ export default function (fastify: FastifyInstance) {
 			request.requireSuperuser(reply);
 			const permissions = await PermissionRepository().getSelectOptions();
 
-			return ResponseToolkit.success(reply, permissions, "Permission select options fetched");
+			return ResponseToolkit.success(reply, permissions, t("settings.select.permissionsFetched"));
 		},
 	);
 
@@ -59,7 +60,7 @@ export default function (fastify: FastifyInstance) {
 			request.requireSuperuser(reply);
 			const roles = await RoleRepository().getSelectOptions();
 
-			return ResponseToolkit.success(reply, roles, "Role select options fetched");
+			return ResponseToolkit.success(reply, roles, t("settings.select.rolesFetched"));
 		},
 	);
 }

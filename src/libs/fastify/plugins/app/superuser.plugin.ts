@@ -1,3 +1,4 @@
+import { t } from "@i18n";
 import { FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 
@@ -10,12 +11,12 @@ declare module "fastify" {
 function requireSuperuser(this: FastifyRequest, reply: FastifyReply) {
 	const userInformation = this.userInformation;
 	if (!userInformation) {
-		reply.status(401).send({ message: "Unauthorized" });
+		reply.status(401).send({ message: t("errors.unauthorized") });
 		return;
 	}
 
 	if (!userInformation.roles.some((role) => role === "superuser")) {
-		reply.status(403).send({ message: "Access denied. Superuser role required." });
+		reply.status(403).send({ message: t("auth.accessDeniedSuperuser") });
 		return;
 	}
 }

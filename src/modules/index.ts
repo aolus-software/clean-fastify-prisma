@@ -1,4 +1,5 @@
 import { AppConfig } from "@config/app.config";
+import { t } from "@i18n";
 import { DateToolkit, ResponseToolkit } from "@utils";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
@@ -40,7 +41,7 @@ export default function (fastify: FastifyInstance) {
 					AppEnvironment: AppConfig.NODE_ENV,
 					CurrentTime: DateToolkit.getDateTimeInformativeWithTimezone(DateToolkit.now()),
 				},
-				"API is running successfully.",
+				t("common.apiRunning"),
 				200,
 			);
 		},

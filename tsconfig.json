@@ -22,7 +22,7 @@
 		"noFallthroughCasesInSwitch": false,
 		"skipLibCheck": true,
 		"types": ["node"],
-		"typeRoots": ["./node_modules/@types", "./types"],
+		"typeRoots": ["./node_modules/@types", "./types", "./src/types"],
 		"paths": {
 			"@/*": ["./src/*"],
 			"@libs/*": ["./src/libs/*"],
@@ -43,7 +43,9 @@
 			"@types": ["./src/libs/types", "./src/libs/types/index.ts"],
 			"@modules/*": ["./src/modules/*"],
 			"@modules": ["./src/modules", "./src/modules/index.ts"],
-			"@prisma-generated": ["./prisma/generated/client"]
+			"@prisma-generated": ["./prisma/generated/client"],
+			"@i18n": ["./src/libs/i18n"],
+			"@i18n/*": ["./src/libs/i18n/*"]
 		}
 	},
 	"include": ["src", "prisma/seed", "eslint.config.mjs", "prisma.config.ts"],

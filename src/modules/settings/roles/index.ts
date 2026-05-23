@@ -1,3 +1,4 @@
+import { t } from "@i18n";
 import {
 	buildDatatableQueryParamsSchema,
 	createSuccessPaginationResponseSchema,
@@ -49,7 +50,7 @@ export default function (fastify: FastifyInstance) {
 			const service = fastify.di.resolve(RoleService);
 			const data = await service.findAll(queryParams);
 
-			return ResponseToolkit.success(reply, data, "Roles fetched");
+			return ResponseToolkit.success(reply, data, t("settings.roles.fetched"));
 		},
 	);
 
@@ -73,7 +74,7 @@ export default function (fastify: FastifyInstance) {
 			const service = fastify.di.resolve(RoleService);
 			await service.create(request.body as z.infer<typeof CreateRoleSchema>);
 
-			return ResponseToolkit.success(reply, {}, "Role created", 201);
+			return ResponseToolkit.success(reply, {}, t("settings.roles.created"), 201);
 		},
 	);
 
@@ -99,7 +100,7 @@ export default function (fastify: FastifyInstance) {
 			const service = fastify.di.resolve(RoleService);
 			const data = await service.detail(roleId);
 
-			return ResponseToolkit.success(reply, data, "Role detail fetched");
+			return ResponseToolkit.success(reply, data, t("settings.roles.detailFetched"));
 		},
 	);
 
@@ -126,7 +127,7 @@ export default function (fastify: FastifyInstance) {
 			const service = fastify.di.resolve(RoleService);
 			await service.update(roleId, request.body as z.infer<typeof UpdateRoleSchema>);
 
-			return ResponseToolkit.success(reply, {}, "Role updated");
+			return ResponseToolkit.success(reply, {}, t("settings.roles.updated"));
 		},
 	);
 
@@ -152,7 +153,7 @@ export default function (fastify: FastifyInstance) {
 			const service = fastify.di.resolve(RoleService);
 			await service.delete(roleId);
 
-			return ResponseToolkit.success(reply, {}, "Role deleted");
+			return ResponseToolkit.success(reply, {}, t("settings.roles.deleted"));
 		},
 	);
 }
