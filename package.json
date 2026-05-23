@@ -8,8 +8,8 @@
 	},
 	"scripts": {
 		"dev": "concurrently --kill-others-on-fail --prefix-colors \"bgBlue.bold,bgMagenta.bold\" --names \"API,WORKER\" \"bun run dev:server\" \"bun run dev:worker\"",
-		"dev:server": "bun run --hot --watch ./src/serve.ts",
-		"dev:worker": "bun run --hot --watch ./src/bull/index.ts",
+		"dev:server": "APP_CLUSTER_WORKERS=1 bun run --hot --watch ./src/serve.ts",
+		"dev:worker": "APP_CLUSTER_WORKERS=1 bun run --hot --watch ./src/bull/index.ts",
 		"build": "bun run typecheck && bun run build:server && bun run build:worker",
 		"build:server": "bun build --target bun --minify-whitespace --minify-syntax --outfile ./dist/serve.js src/serve.ts",
 		"build:worker": "bun build --target bun --minify-whitespace --minify-syntax --outfile ./dist/worker.js src/bull/index.ts",

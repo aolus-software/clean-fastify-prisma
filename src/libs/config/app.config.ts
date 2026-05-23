@@ -16,6 +16,7 @@ const env = cleanEnv(process.env, {
 	APP_JWT_REFRESH_EXPIRES_IN: num({ default: 604800 }),
 	LOG_LEVEL: str({ default: "info", choices: ["info", "warn", "debug"] }),
 	CLIENT_URL: url({ default: "http://localhost:3000" }),
+	APP_CLUSTER_WORKERS: num({ default: 0 }),
 });
 
 interface IAppConfig {
@@ -31,6 +32,7 @@ interface IAppConfig {
 	APP_JWT_REFRESH_EXPIRES_IN: number;
 	LOG_LEVEL: "info" | "warn" | "debug";
 	CLIENT_URL: string;
+	APP_CLUSTER_WORKERS: number;
 }
 
 export const AppConfig: IAppConfig = {
@@ -46,4 +48,5 @@ export const AppConfig: IAppConfig = {
 	APP_JWT_REFRESH_EXPIRES_IN: env.APP_JWT_REFRESH_EXPIRES_IN,
 	LOG_LEVEL: env.LOG_LEVEL,
 	CLIENT_URL: env.CLIENT_URL,
+	APP_CLUSTER_WORKERS: env.APP_CLUSTER_WORKERS,
 };

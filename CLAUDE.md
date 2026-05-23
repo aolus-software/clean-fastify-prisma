@@ -49,6 +49,8 @@ Two processes run side-by-side in both dev and prod:
 
 They share the same codebase, DI container, Prisma client, and Redis connection, but are deployed/started independently.
 
+Both entries cluster-fork via `node:cluster` when `APP_CLUSTER_WORKERS` resolves to >1. The shared bootstrap is `runWithCluster()` from `@utils` (`src/libs/utils/cluster.ts`): the primary supervises and respawns crashed children; each child runs the full Fastify/BullMQ boot independently. `APP_CLUSTER_WORKERS=0` (the default) means "auto = `os.cpus().length`"; `1` disables clustering. Dev scripts pin it to `1` so `--hot --watch` keeps working.
+
 ### Plugin load order (matters)
 
 `createAppInstance()` registers plugins in a specific order; the autoloader respects it:
