@@ -1,4 +1,9 @@
+bun install
 bun run format
 bun run lint:fix
+bunx --bun prisma validate
+bunx --bun prisma format
+bunx --bun prisma migrate dev
+bunx --bun prisma generate
+bun run tsc --noEmit
 bun run build
-bunx --bun prisma migrate deploy
