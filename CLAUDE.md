@@ -41,14 +41,18 @@ The Husky `pre-commit` hook runs `bun run format && bun run lint:fix && bun run 
 ## High-level architecture
 
 ### Process model
+
 Two processes run side-by-side in both dev and prod:
+
 - **API** — `src/serve.ts` → `createAppInstance()` in `src/app.ts`
 - **Worker** — `src/bull/index.ts` — BullMQ consumer for queues defined under `src/bull/queue/`, processed by `src/bull/worker/`
 
 They share the same codebase, DI container, Prisma client, and Redis connection, but are deployed/started independently.
 
 ### Plugin load order (matters)
+
 `createAppInstance()` registers plugins in a specific order; the autoloader respects it:
+
 1. **Infrastructure** inline — `fastifyJwt`, `fastifyRedis`, Zod validator/serializer compiler (`fastify-type-provider-zod`).
 2. **Externals** — autoloaded from `src/libs/fastify/plugins/externals/` (Helmet, CORS, rate limiting, Swagger).
 3. **App plugins** — autoloaded from `src/libs/fastify/plugins/app/` (`auth`, `authorization`, `di`, `error`, `superuser`).
@@ -57,7 +61,9 @@ They share the same codebase, DI container, Prisma client, and Redis connection,
 When adding cross-cutting behavior, decide whether it belongs in `plugins/externals/` (third-party middleware) or `plugins/app/` (project-specific behavior) — don't put it in a module.
 
 ### Module convention (`src/modules/<feature>/`)
+
 A module is a triple:
+
 - `index.ts` — Fastify route handlers. Keep handlers thin: parse, call service, return via `ResponseToolkit`. Each route declares its `body`/`response` Zod schemas inline in the route options.
 - `schema.ts` — Zod schemas for request bodies and response shapes.
 - `service.ts` — All business logic. Decorated with `@injectable()` from tsyringe and resolved per-request via `fastify.di.resolve(ServiceClass)`.
@@ -65,20 +71,25 @@ A module is a triple:
 Existing modules: `auth`, `health`, `profile`, `settings`. Mirror their structure when adding new ones.
 
 ### Dependency injection
+
 The DI container is **tsyringe**, re-exported through `src/libs/fastify/di/`. Services are `@injectable()` classes; access them inside route handlers with `fastify.di.resolve(Service)` (the `di` decorator is added by `plugins/app/di.plugin.ts`). `reflect-metadata` is imported in the container module — TS config has `emitDecoratorMetadata` and `experimentalDecorators` enabled.
 
 ### Data layer
+
 - **Postgres** via Prisma (`prisma/schema.prisma`, generated client at `prisma/generated/client`, imported as `@prisma-generated`). Access goes through repository factories in `src/libs/database/postgres/repositories/` (e.g. `UserRepository()`, `UserRepository(tx)` for a transaction). The shared client is exported as `db` from `@database`; multi-statement work uses `db.$transaction(async (tx: TransactionClient) => ...)` and the repository factory accepts the `tx`.
 - **ClickHouse** via `@clickhouse/client` — separate client, services, and a custom migration runner under `src/libs/database/clickhouse/`.
 - **Redis** via `@fastify/redis` (request-scoped) and `ioredis` (libs/cache, BullMQ).
 
 ### Errors
+
 Throw typed errors from `src/libs/fastify/error/` (`UnprocessableEntityError`, `UnauthorizedError`, `BadRequestError`, `ConflictError`, `ForbiddenError`, `NotFoundError`, `InternalServerError`, base `HttpError`). The global error plugin (`plugins/app/error.plugin.ts`) maps them to the response envelope. Do not return raw error responses or use `reply.code(...).send({ message })` for known failure cases — throw an error class instead.
 
 ### Success responses
+
 Use `ResponseToolkit.success(reply, data, message, status?)` from `@utils` for consistent envelopes. Route `response` schemas should reference the shared `SuccessResponseSchema`, `ValidationErrorResponseSchema`, `UnauthorizedResponseSchema`, `ServerErrorResponseSchema` from the module's `schema.ts` / shared schemas.
 
 ### Path aliases (defined in `tsconfig.json`)
+
 Use these instead of deep relative imports. Crossing layer boundaries with `../../..` is a code smell here.
 
 ```

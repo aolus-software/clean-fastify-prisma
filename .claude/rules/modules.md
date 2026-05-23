@@ -65,23 +65,25 @@ Current modules: `auth`, `health`, `profile`, `settings` — mirror their layout
 ## `modules/<feature>/service.ts` — business logic
 
 - Export an `@injectable()` **class** (not a plain object) — DI requires the class:
+
   ```ts
   import { injectable, UnprocessableEntityError } from "@fastify-libs";
   import { UserRepository, db, type TransactionClient } from "@database";
 
   @injectable()
   export class FooService {
-    async doThing(payload: FooPayload) {
-      const user = await UserRepository().findByEmail(payload.email);
-      if (!user) {
-        throw new UnprocessableEntityError("Validation error", [
-          { field: "email", message: "User not found" },
-        ]);
-      }
-      // ...
-    }
+  	async doThing(payload: FooPayload) {
+  		const user = await UserRepository().findByEmail(payload.email);
+  		if (!user) {
+  			throw new UnprocessableEntityError("Validation error", [
+  				{ field: "email", message: "User not found" },
+  			]);
+  		}
+  		// ...
+  	}
   }
   ```
+
 - Constructors are usually **empty**. Call repository factories inline (`UserRepository()`, `RoleRepository()`) rather than injecting them via the constructor. See [`repositories.md`](./repositories.md) for why.
 - Services own orchestration: state-dependent validation, transactions, cache invalidation, queue dispatch. They call repository methods through the factory: `UserRepository().findByEmail(...)`, `UserRepository(tx).create(...)`.
 - Wrap multi-step mutations in `db.$transaction(async (tx: TransactionClient) => { ... })` and pass `tx` down by calling `UserRepository(tx).create(...)`. Anything that writes to ≥2 tables needs a transaction.

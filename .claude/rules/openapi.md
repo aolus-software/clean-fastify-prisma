@@ -43,7 +43,9 @@ fastify.post(
 			},
 		},
 	},
-	async (request, reply) => { /* ... */ },
+	async (request, reply) => {
+		/* ... */
+	},
 );
 ```
 

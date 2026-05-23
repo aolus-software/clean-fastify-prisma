@@ -8,20 +8,20 @@ If a piece of code is used by **more than one feature module** — or could plau
 
 ## The buckets (and what belongs in each)
 
-| Bucket                           | Alias               | Belongs here                                                                                                                                                |
-| -------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `libs/cache/`                    | `@cache`            | Cache wrapper helpers and cache-key builders (`UserInformationCacheKey`, …)                                                                                 |
-| `libs/config/`                   | `@config`           | Env-derived config objects (`AppConfig`, `DatabaseConfig`, `RedisConfig`, `MailConfig`, `CorsConfig`, `ClickHouseConfig`) — typed via `envalid`              |
-| `libs/database/`                 | `@database`         | `db` (Prisma client), `TransactionClient`, repository factories, `RedisClient`, ClickHouse client                                                           |
-| `libs/fastify/default/`          | `@fastify-libs`     | Stable cross-feature constants (`StrongPassword`, `paginationLength`, `defaultSort`, `verificationTokenLifetime`, `maxUploadFile`, `allowedFileUploads`)    |
-| `libs/fastify/error/`            | `@fastify-libs`     | Custom HTTP error classes (`HttpError`, `BadRequestError`, `UnprocessableEntityError`, `NotFoundError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`, `InternalServerError`) |
-| `libs/fastify/di/`               | `@fastify-libs`     | tsyringe re-exports: `container`, `injectable`, `inject`, `singleton`, `scoped`                                                                             |
-| `libs/fastify/plugins/`          | `@fastify-libs`     | Reusable Fastify plugins (`app/`: auth, authorization, di, error, superuser; `externals/`: helmet, cors, rate-limit, swagger)                               |
-| `libs/mail/`                     | `@libs/mail/...`    | Mail transport, templates, and `EmailService` (currently imported via deep path `@libs/mail/mail.service`)                                                  |
-| `libs/types/`                    | `@types`            | Shared TypeScript types (DTOs, query-param types, enums-as-types, queue payload shapes, `UserInformation`)                                                  |
-| `libs/utils/`                    | `@utils`            | Pure helpers (`Hash`, `Encrypt`, `logger`, `ResponseToolkit`, `DatatableToolkit`, `DateToolkit`, `StrToolkit`, `NumToolkit`, response-schema builders)        |
-| `modules/`                       | `@modules`          | Feature folders — co-located `index.ts`, `schema.ts`, `service.ts`                                                                                          |
-| `bull/`                          | `@bull`             | BullMQ queues, workers, and the worker entry                                                                                                                |
+| Bucket                  | Alias            | Belongs here                                                                                                                                                                           |
+| ----------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/cache/`           | `@cache`         | Cache wrapper helpers and cache-key builders (`UserInformationCacheKey`, …)                                                                                                            |
+| `libs/config/`          | `@config`        | Env-derived config objects (`AppConfig`, `DatabaseConfig`, `RedisConfig`, `MailConfig`, `CorsConfig`, `ClickHouseConfig`) — typed via `envalid`                                        |
+| `libs/database/`        | `@database`      | `db` (Prisma client), `TransactionClient`, repository factories, `RedisClient`, ClickHouse client                                                                                      |
+| `libs/fastify/default/` | `@fastify-libs`  | Stable cross-feature constants (`StrongPassword`, `paginationLength`, `defaultSort`, `verificationTokenLifetime`, `maxUploadFile`, `allowedFileUploads`)                               |
+| `libs/fastify/error/`   | `@fastify-libs`  | Custom HTTP error classes (`HttpError`, `BadRequestError`, `UnprocessableEntityError`, `NotFoundError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`, `InternalServerError`) |
+| `libs/fastify/di/`      | `@fastify-libs`  | tsyringe re-exports: `container`, `injectable`, `inject`, `singleton`, `scoped`                                                                                                        |
+| `libs/fastify/plugins/` | `@fastify-libs`  | Reusable Fastify plugins (`app/`: auth, authorization, di, error, superuser; `externals/`: helmet, cors, rate-limit, swagger)                                                          |
+| `libs/mail/`            | `@libs/mail/...` | Mail transport, templates, and `EmailService` (currently imported via deep path `@libs/mail/mail.service`)                                                                             |
+| `libs/types/`           | `@types`         | Shared TypeScript types (DTOs, query-param types, enums-as-types, queue payload shapes, `UserInformation`)                                                                             |
+| `libs/utils/`           | `@utils`         | Pure helpers (`Hash`, `Encrypt`, `logger`, `ResponseToolkit`, `DatatableToolkit`, `DateToolkit`, `StrToolkit`, `NumToolkit`, response-schema builders)                                 |
+| `modules/`              | `@modules`       | Feature folders — co-located `index.ts`, `schema.ts`, `service.ts`                                                                                                                     |
+| `bull/`                 | `@bull`          | BullMQ queues, workers, and the worker entry                                                                                                                                           |
 
 Everything in `libs/fastify/` is re-exported through the single `@fastify-libs` barrel — don't deep-import from `@fastify-libs/error/...` when `@fastify-libs` already re-exports the symbol.
 

@@ -20,7 +20,9 @@ export function UserRepository(tx?: TransactionClient) {
 		async findByEmail(email: string): Promise<UserForAuth | null> {
 			const user = await dbClient.user.findFirst({
 				where: { email, deleted_at: null },
-				select: { /* ... */ },
+				select: {
+					/* ... */
+				},
 			});
 			if (!user) return null;
 			return user;
