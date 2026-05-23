@@ -8,7 +8,6 @@ interface IMigrationFile {
 	name: string;
 	path: string;
 }
-
 class ClickHouseMigrator {
 	private client;
 	private migrationsDir = join(process.cwd(), "src/libs/database/clickhouse/migrations");
@@ -156,6 +155,7 @@ async function main() {
 	process.exit(0);
 }
 
+// eslint-disable-next-line no-console
 main().catch(console.error);
 
 export { ClickHouseMigrator };
