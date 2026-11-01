@@ -1,12 +1,14 @@
 import { FastifyReply } from "fastify";
 
+export type FieldError = { field: string; message: string };
+
 export class ResponseToolkit {
 	static success<T>(
 		reply: FastifyReply,
 		data: T | null,
 		message: string = "Success",
 		statusCode: number = 200,
-	) {
+	): FastifyReply {
 		return reply.status(statusCode).send({
 			status: statusCode,
 			success: true,
@@ -15,29 +17,21 @@ export class ResponseToolkit {
 		});
 	}
 
-	static error<T>(reply: FastifyReply, message: string, statusCode: number = 400, data?: T) {
+	static error(reply: FastifyReply, message: string, statusCode: number = 400): FastifyReply {
 		return reply.status(statusCode).send({
 			status: statusCode,
 			success: false,
 			message,
-			data,
+			data: null,
 		});
-	}
-
-	static notFound(reply: FastifyReply, message: string = "Resource not found") {
-		return this.error(reply, message, 404);
-	}
-
-	static unauthorized(reply: FastifyReply, message: string = "Unauthorized") {
-		return this.error(reply, message, 401);
 	}
 
 	static validationError(
 		reply: FastifyReply,
-		errors: Array<{ field: string; message: string } | { [key: string]: string }>,
+		errors: FieldError[],
 		message: string = "Validation failed",
 		statusCode: number = 422,
-	) {
+	): FastifyReply {
 		return reply.status(statusCode).send({
 			status: statusCode,
 			success: false,

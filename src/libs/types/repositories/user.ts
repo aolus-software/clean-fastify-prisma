@@ -1,54 +1,56 @@
-export type UserStatusEnum = "active" | "inactive" | "suspended" | "blocked";
+import type { UserStatus } from "@prisma-generated";
 
-export type UserInformation = {
+export type UserStatusEnum = UserStatus;
+
+export interface UserInformation {
 	id: string;
 	name: string;
 	email: string;
 	roles: string[];
-	permissions: {
-		name: string;
-		permissions: string[];
-	}[];
-};
+	permissions: string[];
+}
 
 export type UserList = {
 	id: string;
 	name: string;
 	email: string;
-	status: UserStatusEnum | null;
-	roles: string[] | null;
-	created_at: Date | null;
-	updated_at: Date | null;
-};
-
-export type UserCreate = {
-	name: string;
-	email: string;
-	password: string;
-	status?: UserStatusEnum;
-	remark?: string;
-	role_ids?: string[];
+	status: UserStatusEnum;
+	remark: string | null;
+	roles: string[];
+	createdAt: Date;
+	updatedAt: Date;
 };
 
 export type UserDetail = {
 	id: string;
 	name: string;
 	email: string;
-	status: UserStatusEnum | null;
+	status: UserStatusEnum;
 	remark: string | null;
 	roles: {
 		id: string;
 		name: string;
 	}[];
-	created_at: Date | null;
-	updated_at: Date | null;
+	createdAt: Date;
+	updatedAt: Date;
 };
+
+export type UserCreate = {
+	name: string;
+	email: string;
+	password: string;
+	status: UserStatusEnum;
+	remark: string | null;
+	roleIds: string[];
+};
+
+export type UserUpdate = Omit<UserCreate, "password">;
 
 export type UserForAuth = {
 	id: string;
 	name: string;
 	email: string;
 	password: string;
-	status: UserStatusEnum | null;
-	email_verified_at: Date | null;
+	status: UserStatusEnum;
+	emailVerifiedAt: Date | null;
 };

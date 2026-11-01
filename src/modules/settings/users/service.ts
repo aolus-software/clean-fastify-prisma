@@ -1,111 +1,99 @@
-import { db, RoleRepository, type TransactionClient, UserRepository } from "@database";
-import { injectable, UnprocessableEntityError } from "@fastify-libs";
+import { Session } from "@cache";
+import { db, RoleRepository, type TransactionClient, UserRepository, UserStatus } from "@database";
+import { injectable, NotFoundError, UnprocessableEntityError } from "@fastify-libs";
 import { t } from "@i18n";
-import { DatatableType, PaginationResponse, UserDetail, UserList, UserStatusEnum } from "@types";
+import { AuthMailService } from "@libs/mail/auth-mail.service";
+import {
+	DatatableType,
+	PaginationResponse,
+	UserCreate,
+	UserDetail,
+	UserList,
+	UserUpdate,
+} from "@types";
 import { Hash } from "@utils";
 
 @injectable()
 export class UserService {
-	async findAll(queryParam: DatatableType): Promise<PaginationResponse<UserList>> {
-		const { data, total } = await UserRepository().findAll({
-			page: queryParam.page,
-			limit: queryParam.limit,
-			sort_by: queryParam.sort,
-			sort_order: queryParam.sortDirection,
-			search: queryParam.search ?? undefined,
-		});
-
-		return {
-			data,
-			meta: {
-				page: queryParam.page,
-				limit: queryParam.limit,
-				totalCount: total,
-			},
-		};
+	async findAll(query: DatatableType): Promise<PaginationResponse<UserList>> {
+		return await UserRepository().findAll(query);
 	}
 
-	async create(data: {
-		name: string;
-		email: string;
-		password: string;
-		role_ids: string[];
-		remark?: string;
-		status?: UserStatusEnum;
-	}): Promise<void> {
-		const emailExists = await UserRepository().emailExists(data.email);
-		if (emailExists) {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
-				{ field: "email", message: t("settings.users.emailExists") },
-			]);
-		}
-
-		const roles = await RoleRepository().findAll({
-			page: 1,
-			limit: data.role_ids.length,
-			sort_by: "created_at",
-			sort_order: "desc",
-		});
-
-		const validIds = roles.data.map((r) => r.id);
-		const allValid = data.role_ids.every((id) => validIds.includes(id));
-		if (!allValid) {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
-				{ field: "role_ids", message: t("settings.users.invalidRoles") },
-			]);
-		}
-
-		const hashedPassword = await Hash.generateHash(data.password);
-		await db.$transaction(async (tx: TransactionClient) => {
-			await UserRepository(tx).create({
-				...data,
-				password: hashedPassword,
-			});
-		});
-	}
-
-	async detail(userId: string): Promise<UserDetail> {
-		const user = await UserRepository().findById(userId);
+	async findOne(id: string): Promise<UserDetail> {
+		const user = await UserRepository().getDetail(id);
 		if (!user) {
-			throw new UnprocessableEntityError(t("auth.userNotFound"), [
-				{ field: "userId", message: t("auth.userNotFound") },
-			]);
+			throw new NotFoundError(t("settings.users.notFound"));
 		}
 		return user;
 	}
 
-	async update(
-		id: string,
-		data: {
-			name: string;
-			email: string;
-			role_ids: string[];
-			remark?: string;
-			status?: UserStatusEnum;
-		},
-	): Promise<void> {
-		const emailExists = await UserRepository().emailExists(data.email, id);
-		if (emailExists) {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
-				{ field: "email", message: t("settings.users.emailExists") },
-			]);
-		}
+	async create(data: UserCreate): Promise<void> {
+		await this.assertEmailAvailable(data.email);
+		await this.assertRolesExist(data.roleIds);
+
+		const password = await Hash.generateHash(data.password);
+		await db.$transaction(async (tx: TransactionClient) => {
+			await UserRepository(tx).create({ ...data, password });
+		});
+	}
+
+	async update(id: string, data: UserUpdate): Promise<void> {
+		await this.findLive(id);
+		await this.assertEmailAvailable(data.email, id);
+		await this.assertRolesExist(data.roleIds);
 
 		await db.$transaction(async (tx: TransactionClient) => {
 			await UserRepository(tx).update(id, data);
 		});
+		if (data.status === UserStatus.ACTIVE) {
+			await Session.forgetUsers([id]);
+		} else {
+			await Session.revokeSessions(id);
+		}
 	}
 
-	async delete(userId: string): Promise<void> {
-		await db.$transaction(async (tx: TransactionClient) => {
-			await UserRepository(tx).softDelete(userId);
-		});
+	async delete(id: string): Promise<void> {
+		await this.findLive(id);
+		await UserRepository().softDelete(id);
+		await Session.revokeSessions(id);
 	}
 
-	async resetPassword(userId: string, data: { password: string }): Promise<void> {
-		const hashedPassword = await Hash.generateHash(data.password);
-		await db.$transaction(async (tx: TransactionClient) => {
-			await UserRepository(tx).updatePassword(userId, hashedPassword);
-		});
+	async resetPassword(id: string, newPassword: string): Promise<void> {
+		await this.findLive(id);
+		await UserRepository().updatePassword(id, await Hash.generateHash(newPassword));
+		await Session.revokeSessions(id);
+	}
+
+	async sendVerificationEmail(id: string): Promise<void> {
+		await AuthMailService.sendVerificationEmail(await this.findLive(id));
+	}
+
+	async sendResetPasswordEmail(id: string): Promise<void> {
+		await AuthMailService.sendResetPasswordEmail(await this.findLive(id));
+	}
+
+	private async findLive(id: string): Promise<{ id: string; name: string; email: string }> {
+		const user = await UserRepository().findById(id);
+		if (!user) {
+			throw new NotFoundError(t("settings.users.notFound"));
+		}
+		return user;
+	}
+
+	private async assertEmailAvailable(email: string, excludeId?: string): Promise<void> {
+		if (await UserRepository().findLiveByEmail(email, excludeId)) {
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "email", message: t("settings.users.emailExists") },
+			]);
+		}
+	}
+
+	private async assertRolesExist(roleIds: string[]): Promise<void> {
+		const unique = [...new Set(roleIds)];
+		if ((await RoleRepository().countByIds(unique)) !== unique.length) {
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "roleIds", message: t("settings.users.invalidRoles") },
+			]);
+		}
 	}
 }

@@ -1,193 +1,193 @@
-import { sendEmailQueue } from "@bull/queue/send-email.queue";
-import { AppConfig } from "@config";
+import { Cache, RefreshTokenCacheKey, Session } from "@cache";
+import { JwtConfig } from "@config";
 import {
 	db,
 	EmailVerificationRepository,
-	ForgotPasswordRepository,
+	PasswordResetRepository,
 	type TransactionClient,
 	UserRepository,
+	UserStatus,
 } from "@database";
-import { injectable, UnprocessableEntityError, verificationTokenLifetime } from "@fastify-libs";
+import type { JWT } from "@fastify/jwt";
+import {
+	BadRequestError,
+	injectable,
+	UnauthorizedError,
+	UnprocessableEntityError,
+} from "@fastify-libs";
 import { t } from "@i18n";
-import { UserInformation } from "@types";
-import { Hash, StrToolkit } from "@utils";
+import { AuthMailService } from "@libs/mail/auth-mail.service";
+import { AccessTokenPayload, RefreshTokenPayload, TokenPair, UserInformation } from "@types";
+import { Hash, logger, StrToolkit } from "@utils";
+
+/* A real bcrypt hash of a random string. Login compares against it when the email is unknown so
+   the response time does not reveal whether an account exists. */
+const DUMMY_PASSWORD_HASH = "$2b$10$kcnIBQPdVdQFzLsfjwlfhOiScH0eMZ8VOlm/VyfanNbzsVLuOLSmq";
 
 @injectable()
 export class AuthService {
+	/**
+	 * The password is checked before any account state, and an unknown email and a wrong password
+	 * get the same answer, so an unauthenticated caller cannot learn whether an address is
+	 * registered, unverified, or inactive without already knowing its password.
+	 */
 	async login(email: string, password: string): Promise<UserInformation> {
 		const user = await UserRepository().findByEmail(email);
+		const isPasswordValid = await Hash.compareHash(password, user?.password ?? DUMMY_PASSWORD_HASH);
 
-		if (!user) {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
+		if (!user || !isPasswordValid) {
+			throw new BadRequestError(t("auth.validationError"), [
 				{ field: "email", message: t("auth.invalidCredentials") },
 			]);
 		}
 
-		if (user.email_verified_at === null) {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
+		if (user.emailVerifiedAt === null) {
+			throw new BadRequestError(t("auth.validationError"), [
 				{ field: "email", message: t("auth.emailNotVerified") },
 			]);
 		}
 
-		if (user.status !== "active") {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
-				{
-					field: "email",
-					message: t("auth.accountInactive"),
-				},
+		if (user.status !== UserStatus.ACTIVE) {
+			throw new BadRequestError(t("auth.validationError"), [
+				{ field: "email", message: t("auth.accountInactive") },
 			]);
 		}
 
-		const isPasswordValid = await Hash.compareHash(password, user.password);
-		if (!isPasswordValid) {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
-				{ field: "email", message: t("auth.invalidCredentials") },
-			]);
+		await Session.forgetUsers([user.id]);
+		const information = await Session.getUserInformation(user.id);
+		if (!information) {
+			throw new UnauthorizedError(t("auth.userNotFound"));
 		}
 
-		const userInfo = await UserRepository().findUserInformation(user.id);
-		if (!userInfo) {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
-				{ field: "email", message: t("auth.userNotFound") },
-			]);
-		}
-
-		return userInfo;
+		logger.info({ userId: user.id }, "User logged in");
+		return information;
 	}
 
 	async register(payload: { name: string; email: string; password: string }): Promise<void> {
-		const emailExists = await UserRepository().emailExists(payload.email);
-		if (emailExists) {
-			throw new UnprocessableEntityError(t("auth.emailAlreadyInUse"), [
+		if (await UserRepository().findLiveByEmail(payload.email)) {
+			throw new UnprocessableEntityError(t("auth.validationError"), [
 				{ field: "email", message: t("auth.emailAlreadyRegistered") },
 			]);
 		}
 
 		const hashedPassword = await Hash.generateHash(payload.password);
-
-		await db.$transaction(async (tx: TransactionClient) => {
-			const userId = await UserRepository(tx).create({
+		const { user, token } = await db.$transaction(async (tx: TransactionClient) => {
+			const created = await UserRepository(tx).create({
 				name: payload.name,
 				email: payload.email,
 				password: hashedPassword,
-				status: "active",
+				status: UserStatus.ACTIVE,
+				remark: null,
 			});
-
-			const token = StrToolkit.random(255);
-			await EmailVerificationRepository(tx).create(userId, token, verificationTokenLifetime);
-
-			await sendEmailQueue.add("send-email", {
-				subject: t("mail.subject.verification"),
-				to: payload.email,
-				template: "/auth/email-verification",
-				variables: {
-					user_id: userId,
-					user_name: payload.name,
-					user_email: payload.email,
-					verification_url: `${AppConfig.CLIENT_URL}/auth/verify-email?token=${token}`,
-				},
-			});
+			const verificationToken = await AuthMailService.issueVerificationToken(created.id, tx);
+			return { user: created, token: verificationToken };
 		});
+
+		await AuthMailService.queueVerificationEmail(user, token);
 	}
 
-	async resendVerification(payload: { email: string }): Promise<void> {
-		const user = await UserRepository().findByEmail(payload.email);
-		if (!user) return;
-
-		if (user.email_verified_at !== null) {
-			throw new UnprocessableEntityError(t("auth.emailAlreadyVerified"), [
-				{ field: "email", message: t("auth.emailAlreadyVerified") },
-			]);
+	async resendVerification(email: string): Promise<void> {
+		const user = await UserRepository().findByEmail(email);
+		if (!user || user.emailVerifiedAt !== null) {
+			return;
 		}
 
-		const token = StrToolkit.random(255);
-		await db.$transaction(async (tx: TransactionClient) => {
-			await EmailVerificationRepository(tx).create(user.id, token, verificationTokenLifetime);
-
-			await sendEmailQueue.add("send-email", {
-				subject: t("mail.subject.verification"),
-				to: payload.email,
-				template: "/auth/email-verification",
-				variables: {
-					user_id: user.id,
-					user_name: user.name,
-					user_email: user.email,
-					verification_url: `${AppConfig.CLIENT_URL}/auth/verify-email?token=${token}`,
-				},
-			});
-		});
+		await AuthMailService.sendVerificationEmail(user);
 	}
 
-	async verifyEmail(payload: { token: string }): Promise<void> {
-		const record = await EmailVerificationRepository().findByToken(payload.token);
-
-		if (!record) {
-			throw new UnprocessableEntityError(t("auth.invalidVerificationToken"), [
+	async verifyEmail(token: string): Promise<void> {
+		const record = await EmailVerificationRepository().findByToken(token);
+		if (!record || record.expiresAt < new Date() || record.usedAt !== null) {
+			throw new BadRequestError(t("auth.validationError"), [
 				{ field: "token", message: t("auth.invalidVerificationToken") },
 			]);
 		}
 
 		await db.$transaction(async (tx: TransactionClient) => {
-			await UserRepository(tx).updateEmailVerifiedAt(record.user_id);
-			await EmailVerificationRepository(tx).delete(record.id);
+			await UserRepository(tx).markEmailVerified(record.userId);
+			await EmailVerificationRepository(tx).markAllUsed(record.userId);
 		});
+
+		logger.info({ userId: record.userId }, "Email verified");
 	}
 
 	async forgotPassword(email: string): Promise<void> {
 		const user = await UserRepository().findByEmail(email);
-		if (!user) return;
+		if (!user) {
+			return;
+		}
 
-		const token = StrToolkit.random(255);
-		await ForgotPasswordRepository().create(user.id, token);
-
-		await sendEmailQueue.add("send-email", {
-			subject: t("mail.subject.resetPassword"),
-			to: email,
-			template: "/auth/forgot-password",
-			variables: {
-				user_id: user.id,
-				user_name: user.name,
-				user_email: user.email,
-				reset_password_url: `${AppConfig.CLIENT_URL}/auth/reset-password?token=${token}`,
-			},
-		});
+		await AuthMailService.sendResetPasswordEmail(user);
 	}
 
 	async resetPassword(token: string, newPassword: string): Promise<void> {
-		const passwordReset = await ForgotPasswordRepository().findByToken(token);
-		if (!passwordReset) {
-			throw new UnprocessableEntityError(t("auth.validationError"), [
+		const record = await PasswordResetRepository().findByToken(token);
+		if (!record || record.expiresAt < new Date() || record.usedAt !== null) {
+			throw new BadRequestError(t("auth.validationError"), [
 				{ field: "token", message: t("auth.invalidResetToken") },
 			]);
 		}
 
-		const hashPassword = await Hash.generateHash(newPassword);
+		const hashedPassword = await Hash.generateHash(newPassword);
 		await db.$transaction(async (tx: TransactionClient) => {
-			await UserRepository(tx).updatePassword(passwordReset.user_id, hashPassword);
-			await ForgotPasswordRepository(tx).delete(passwordReset.id);
+			await UserRepository(tx).updatePassword(record.userId, hashedPassword);
+			await PasswordResetRepository(tx).markAllUsed(record.userId);
 		});
+
+		await Session.revokeSessions(record.userId);
+		logger.info({ userId: record.userId }, "Password reset");
 	}
 
-	async storeRefreshToken(userId: string, refreshToken: string): Promise<void> {
-		// Import RedisClient directly to avoid circular deps
-		const { RedisClient } = await import("@database");
-		const redis = RedisClient.getRedisClient();
-		const key = `refresh_token:${userId}`;
-		await redis.set(key, refreshToken, "EX", AppConfig.APP_JWT_REFRESH_EXPIRES_IN);
+	/**
+	 * Access and refresh tokens are signed with different secrets and carry a `type` claim; the
+	 * auth plugin accepts only `type: "access"` and refresh accepts only `type: "refresh"`. The
+	 * refresh token's `jti` is stored per user, so issuing a pair rotates out the previous one.
+	 */
+	async issueTokens(jwt: JWT, userId: string): Promise<TokenPair> {
+		const jti = StrToolkit.random(32);
+		const accessPayload: AccessTokenPayload = { id: userId, type: "access" };
+		const refreshPayload: RefreshTokenPayload = { id: userId, type: "refresh", jti };
+
+		const accessToken = jwt.sign(accessPayload, {
+			key: JwtConfig.ACCESS_SECRET,
+			expiresIn: JwtConfig.ACCESS_EXPIRES_IN,
+		});
+		const refreshToken = jwt.sign(refreshPayload, {
+			key: JwtConfig.REFRESH_SECRET,
+			expiresIn: JwtConfig.REFRESH_EXPIRES_IN,
+		});
+
+		await Cache.set(RefreshTokenCacheKey(userId), jti, JwtConfig.REFRESH_EXPIRES_IN_SECONDS);
+
+		return { accessToken, refreshToken };
 	}
 
-	async validateRefreshToken(refreshToken: string, userId: string): Promise<boolean> {
-		const { RedisClient } = await import("@database");
-		const redis = RedisClient.getRedisClient();
-		const key = `refresh_token:${userId}`;
-		const storedToken = await redis.get(key);
-		return storedToken === refreshToken;
-	}
+	async refresh(jwt: JWT, refreshToken: string): Promise<TokenPair> {
+		let payload: Partial<RefreshTokenPayload>;
+		try {
+			payload = jwt.verify<Partial<RefreshTokenPayload>>(refreshToken, {
+				key: JwtConfig.REFRESH_SECRET,
+			});
+		} catch {
+			throw new UnauthorizedError(t("auth.invalidRefreshToken"));
+		}
 
-	async revokeRefreshToken(userId: string): Promise<void> {
-		const { RedisClient } = await import("@database");
-		const redis = RedisClient.getRedisClient();
-		const key = `refresh_token:${userId}`;
-		await redis.del(key);
+		if (payload.type !== "refresh" || !payload.id || !payload.jti) {
+			throw new UnauthorizedError(t("auth.invalidRefreshToken"));
+		}
+
+		const storedJti = await Cache.get<string>(RefreshTokenCacheKey(payload.id));
+		if (storedJti !== payload.jti) {
+			throw new UnauthorizedError(t("auth.invalidRefreshToken"));
+		}
+
+		await Session.forgetUsers([payload.id]);
+		const information = await Session.getUserInformation(payload.id);
+		if (!information) {
+			await Session.revokeSessions(payload.id);
+			throw new UnauthorizedError(t("auth.invalidRefreshToken"));
+		}
+
+		return await this.issueTokens(jwt, payload.id);
 	}
 }

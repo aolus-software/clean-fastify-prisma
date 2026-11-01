@@ -1,159 +1,179 @@
+import { PermissionGuard } from "@fastify-libs";
 import { t } from "@i18n";
 import {
-	buildDatatableQueryParamsSchema,
+	BadRequestResponseSchema,
 	createSuccessPaginationResponseSchema,
 	createSuccessResponseSchema,
 	DatatableToolkit,
 	ForbiddenResponseSchema,
 	NotFoundResponseSchema,
+	NullCreatedResponseSchema,
+	NullSuccessResponseSchema,
 	ResponseToolkit,
 	ServerErrorResponseSchema,
 	UnauthorizedResponseSchema,
+	ValidationErrorResponseSchema,
 } from "@utils";
 import { FastifyInstance } from "fastify";
-import { z } from "zod";
+import { ZodTypeProvider } from "fastify-type-provider-zod";
 
 import {
-	CreateRoleSchema,
-	RoleDetailResponseSchema,
-	RoleResponseSchema,
-	UpdateRoleSchema,
+	RoleCreateSchema,
+	RoleDetailSchema,
+	RoleIdParamsSchema,
+	RoleListSchema,
+	RoleQuerySchema,
+	RoleUpdateSchema,
 } from "./schema";
 import { RoleService } from "./service";
 
+const TAGS = ["Settings/Roles"];
+const SECURITY = [{ BearerAuth: [] }];
+const ITEM_ERRORS = {
+	401: UnauthorizedResponseSchema,
+	403: ForbiddenResponseSchema,
+	404: NotFoundResponseSchema,
+	422: ValidationErrorResponseSchema,
+	500: ServerErrorResponseSchema,
+};
+
 export default function (fastify: FastifyInstance) {
-	fastify.addHook("onRequest", async (request, reply) => {
-		await request.authenticate(reply);
+	const app = fastify.withTypeProvider<ZodTypeProvider>();
+
+	app.addHook("onRequest", async (request) => {
+		await request.authenticate();
 	});
 
-	// GET /settings/roles
-	fastify.get(
-		"/",
+	// ======================
+	// GET: /settings/roles
+	// ======================
+	app.get(
+		"",
 		{
+			onRequest: PermissionGuard(["role list"]),
 			schema: {
-				tags: ["Settings/Roles"],
-				security: [{ BearerAuth: [] }],
-				querystring: buildDatatableQueryParamsSchema(
-					["id", "name", "created_at", "updated_at"],
-					["name", "created_at", "updated_at"],
-				),
+				tags: TAGS,
+				summary: "List roles",
+				description: "Paginated roles. Requires 'role list' permission.",
+				security: SECURITY,
+				querystring: RoleQuerySchema,
 				response: {
-					200: createSuccessPaginationResponseSchema(RoleResponseSchema),
+					200: createSuccessPaginationResponseSchema(RoleListSchema),
+					400: BadRequestResponseSchema,
 					401: UnauthorizedResponseSchema,
 					403: ForbiddenResponseSchema,
+					422: ValidationErrorResponseSchema,
 					500: ServerErrorResponseSchema,
 				},
 			},
 		},
 		async (request, reply) => {
-			const queryParams = DatatableToolkit.parseFilter(request);
-			const service = fastify.di.resolve(RoleService);
-			const data = await service.findAll(queryParams);
-
+			const data = await fastify.di
+				.resolve(RoleService)
+				.findAll(DatatableToolkit.parseFilter(request));
 			return ResponseToolkit.success(reply, data, t("settings.roles.fetched"));
 		},
 	);
 
-	// POST /settings/roles
-	fastify.post(
-		"/",
+	// ======================
+	// POST: /settings/roles
+	// ======================
+	app.post(
+		"",
 		{
+			onRequest: PermissionGuard(["role create"]),
 			schema: {
-				tags: ["Settings/Roles"],
-				security: [{ BearerAuth: [] }],
-				body: CreateRoleSchema,
+				tags: TAGS,
+				summary: "Create role",
+				description:
+					"Create a role and grant it permissions. A duplicate name or unknown permission id is a 422. Requires 'role create' permission.",
+				security: SECURITY,
+				body: RoleCreateSchema,
 				response: {
-					201: createSuccessResponseSchema(z.object({}), 201),
+					201: NullCreatedResponseSchema,
 					401: UnauthorizedResponseSchema,
 					403: ForbiddenResponseSchema,
+					422: ValidationErrorResponseSchema,
 					500: ServerErrorResponseSchema,
 				},
 			},
 		},
 		async (request, reply) => {
-			const service = fastify.di.resolve(RoleService);
-			await service.create(request.body as z.infer<typeof CreateRoleSchema>);
-
-			return ResponseToolkit.success(reply, {}, t("settings.roles.created"), 201);
+			await fastify.di.resolve(RoleService).create(request.body);
+			return ResponseToolkit.success(reply, null, t("settings.roles.created"), 201);
 		},
 	);
 
-	// GET /settings/roles/:roleId
-	fastify.get(
-		"/:roleId",
+	// ======================
+	// GET: /settings/roles/:id
+	// ======================
+	app.get(
+		"/:id",
 		{
+			onRequest: PermissionGuard(["role detail"]),
 			schema: {
-				tags: ["Settings/Roles"],
-				security: [{ BearerAuth: [] }],
-				params: z.object({ roleId: z.string().uuid() }),
+				tags: TAGS,
+				summary: "Get role",
+				description:
+					"Role detail with every permission grouped and marked isAssigned. Requires 'role detail' permission.",
+				security: SECURITY,
+				params: RoleIdParamsSchema,
 				response: {
-					200: createSuccessResponseSchema(RoleDetailResponseSchema),
-					401: UnauthorizedResponseSchema,
-					403: ForbiddenResponseSchema,
-					404: NotFoundResponseSchema,
-					500: ServerErrorResponseSchema,
+					200: createSuccessResponseSchema(RoleDetailSchema),
+					...ITEM_ERRORS,
 				},
 			},
 		},
 		async (request, reply) => {
-			const { roleId } = request.params as { roleId: string };
-			const service = fastify.di.resolve(RoleService);
-			const data = await service.detail(roleId);
-
+			const data = await fastify.di.resolve(RoleService).findOne(request.params.id);
 			return ResponseToolkit.success(reply, data, t("settings.roles.detailFetched"));
 		},
 	);
 
-	// PUT /settings/roles/:roleId
-	fastify.put(
-		"/:roleId",
+	// ======================
+	// PATCH: /settings/roles/:id
+	// ======================
+	app.patch(
+		"/:id",
 		{
+			onRequest: PermissionGuard(["role edit"]),
 			schema: {
-				tags: ["Settings/Roles"],
-				security: [{ BearerAuth: [] }],
-				params: z.object({ roleId: z.string().uuid() }),
-				body: UpdateRoleSchema,
-				response: {
-					200: createSuccessResponseSchema(z.object({})),
-					401: UnauthorizedResponseSchema,
-					403: ForbiddenResponseSchema,
-					404: NotFoundResponseSchema,
-					500: ServerErrorResponseSchema,
-				},
+				tags: TAGS,
+				summary: "Update role",
+				description:
+					"Full replace of the name and granted permissions. Holders re-load their permissions on the next request. Requires 'role edit' permission.",
+				security: SECURITY,
+				params: RoleIdParamsSchema,
+				body: RoleUpdateSchema,
+				response: { 200: NullSuccessResponseSchema, ...ITEM_ERRORS },
 			},
 		},
 		async (request, reply) => {
-			const { roleId } = request.params as { roleId: string };
-			const service = fastify.di.resolve(RoleService);
-			await service.update(roleId, request.body as z.infer<typeof UpdateRoleSchema>);
-
-			return ResponseToolkit.success(reply, {}, t("settings.roles.updated"));
+			await fastify.di.resolve(RoleService).update(request.params.id, request.body);
+			return ResponseToolkit.success(reply, null, t("settings.roles.updated"));
 		},
 	);
 
-	// DELETE /settings/roles/:roleId
-	fastify.delete(
-		"/:roleId",
+	// ======================
+	// DELETE: /settings/roles/:id
+	// ======================
+	app.delete(
+		"/:id",
 		{
+			onRequest: PermissionGuard(["role delete"]),
 			schema: {
-				tags: ["Settings/Roles"],
-				security: [{ BearerAuth: [] }],
-				params: z.object({ roleId: z.string().uuid() }),
-				response: {
-					200: createSuccessResponseSchema(z.object({})),
-					401: UnauthorizedResponseSchema,
-					403: ForbiddenResponseSchema,
-					404: NotFoundResponseSchema,
-					500: ServerErrorResponseSchema,
-				},
+				tags: TAGS,
+				summary: "Delete role",
+				description:
+					"Hard delete; grants and assignments cascade. Requires 'role delete' permission.",
+				security: SECURITY,
+				params: RoleIdParamsSchema,
+				response: { 200: NullSuccessResponseSchema, ...ITEM_ERRORS },
 			},
 		},
 		async (request, reply) => {
-			const { roleId } = request.params as { roleId: string };
-			const service = fastify.di.resolve(RoleService);
-			await service.delete(roleId);
-
-			return ResponseToolkit.success(reply, {}, t("settings.roles.deleted"));
+			await fastify.di.resolve(RoleService).delete(request.params.id);
+			return ResponseToolkit.success(reply, null, t("settings.roles.deleted"));
 		},
 	);
 }

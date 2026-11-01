@@ -2,119 +2,170 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Runtime
+## Project
 
-This project runs on **Bun**, not Node. Use `bun`/`bunx` for everything (CLI scripts, package installs, running TypeScript directly). The build step still emits a CJS Node bundle for production, but development and tooling go through Bun.
+A clean-architecture REST starter on **Fastify 5** (Zod type provider) with **Prisma 7** (`@prisma/adapter-pg`)
+on **PostgreSQL**, **Redis** for cache, sessions and the rate limiter (Bun's native `RedisClient`, plus
+ioredis for the rate-limiter store and BullMQ), **BullMQ** for queued mail, optional **ClickHouse**, and **tsyringe**
+for service DI, running on **Bun**, optionally clustered with `node:cluster`. Auth is JWT: an access
+token (1 day, `JWT_SECRET`) plus a refresh token (7 days, `JWT_REFRESH_SECRET`, rotated by
+`/auth/refresh`). The shipped domain is auth (register, verify, login, refresh, forgot/reset
+password), the caller's profile (including password change), and settings for users, roles and
+permissions under RBAC.
 
-## Common commands
+## Commands
 
-Both `bun run <script>` and the `Makefile` targets work; the Makefile just shells out to bun.
+Runtime and package manager are **Bun**; use `bun run` / `bunx`, never npm/pnpm/yarn. The `Makefile`
+wraps the scripts and is the entry point.
 
 ```bash
-bun install                  # install deps
-bun run dev                  # API + BullMQ worker concurrently (hot reload)
-bun run dev:server           # API only
-bun run dev:worker           # worker only
-bun run build                # tsc + bun build → ./dist (CJS, Node target)
-bun run start                # run built API + worker
+# Development
+make dev                  # API + worker with hot reload (bun run dev)
+make dev-server           # API only
+make dev-worker           # BullMQ worker only
 
-bun run lint                 # eslint .ts/.js
-bun run lint:fix
-bun run format               # prettier --write .
-bun run typecheck            # tsc --noEmit
+# Quality
+make lint                 # eslint
+make lint-fix
+make format               # prettier --write .
+bun run format:check
+make typecheck            # tsc --noEmit
+make build                # typecheck + dist/serve.js + dist/worker.js + dist/templates/
+make start                # run the bundled API and worker (start-server / start-worker for one)
 
-bun run db:generate          # prisma generate
-bun run db:migrate           # prisma migrate dev
-bun run db:migrate:deploy    # prisma migrate deploy (used in pre-commit + CI)
-bun run db:push              # prisma db push (dev only)
-bun run db:studio
-bun run db:reset
-bun run db:seed              # runs prisma/seed/index.ts
-bun run db:clickhouse:migrate
-bun run db:clickhouse:status
+# Tests
+# No test runner is configured. Do not invent `bun test` commands.
+
+# Database (Prisma)
+make db-generate          # prisma generate (client into prisma/generated/, git-ignored)
+make db-migrate           # prisma migrate deploy
+make db-migrate-dev       # prisma migrate dev (create + apply a migration locally)
+make db-seed              # permissions + roles (+grants) -> users; idempotent, exits 1 on failure
+make fresh                # DESTRUCTIVE: prisma migrate reset --force + db push + seed (refuses NODE_ENV=production)
+make reset                # generate + migrate + seed
+make db-clickhouse-migrate
+
+# Deployment
+make docker-build | docker-up | docker-down | docker-migrate | docker-seed | docker-deploy
 ```
 
-There is **no test runner configured** — do not invent one. `bun run typecheck` and `bun run lint` are the only correctness checks.
+Seeding creates the 15 `<group> <action>` permissions, the `superuser` and `admin` roles (both granted
+the whole catalogue), and `superuser@example.com` / `admin@example.com` with password
+`S3crEtP4ssw0rd!`. A second run changes nothing.
 
-The Husky `pre-commit` hook runs `bun run format && bun run lint:fix && bun run build && bunx --bun prisma migrate deploy`. A pre-commit failure may be a real migration or build problem, not a flaky hook.
+The pre-commit hook (`.husky/pre-commit`) runs `bun install`, `format`, `lint:fix`, `prisma validate`,
+`prisma format`, `prisma migrate dev`, `prisma generate`, `tsc --noEmit`, `build`. It needs a
+reachable `DATABASE_URL`.
 
-## High-level architecture
+## Architecture
 
-### Process model
+| Alias               | Path                      | Purpose                                                                                                                                |
+| ------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `@config`           | `src/libs/config`         | `env.config.ts` (envalid, the only `process.env` reader) and derived config objects                                                    |
+| `@database`         | `src/libs/database`       | `db` (Prisma + pg pool), `TransactionClient`, `UserStatus`, repository factories and their allow-lists, `RedisClient`                  |
+| `@fastify-libs`     | `src/libs/fastify`        | defaults (`StrongPassword`, `defaultSort`, token lifetimes), error classes, guards, DI re-exports                                      |
+| `@cache`            | `src/libs/cache`          | `Cache`, `Session` (cached `UserInformation`, invalidation), cache-key builders                                                        |
+| `@i18n`             | `src/libs/i18n`           | `t()`, catalogues, generated key union                                                                                                 |
+| `@types`            | `src/libs/types`          | DTOs, token payloads, `DatatableType`, `FilterField`                                                                                   |
+| `@utils`            | `src/libs/utils`          | `ResponseToolkit`, response/query schema builders, `DatatableToolkit`, `Hash`, `StrToolkit`, `DateToolkit`, `logger`, `runWithCluster` |
+| `@libs`             | `src/libs`                | deep imports such as `@libs/mail/auth-mail.service`                                                                                    |
+| `@modules`          | `src/modules`             | feature modules                                                                                                                        |
+| `@bull`             | `src/bull`                | queues, workers, worker entry                                                                                                          |
+| `@prisma-generated` | `prisma/generated/client` | the generated Prisma client                                                                                                            |
 
-Two processes run side-by-side in both dev and prod:
+### Request flow
 
-- **API** — `src/serve.ts` → `createAppInstance()` in `src/app.ts`
-- **Worker** — `src/bull/index.ts` — BullMQ consumer for queues defined under `src/bull/queue/`, processed by `src/bull/worker/`
+Route handler (`src/modules/<feature>/index.ts`) -> service (`src/modules/<feature>/service.ts`,
+`@injectable()`, resolved with `fastify.di.resolve(...)`) -> repository factory
+(`src/libs/database/postgres/repositories/`, `XRepository()` or `XRepository(tx)`). Services open
+every transaction (`db.$transaction`) and pass `tx` into the factory; repositories never open one.
 
-They share the same codebase, DI container, Prisma client, and Redis connection, but are deployed/started independently.
+`src/app.ts` registers everything **explicitly** (no autoload, so the bundled `dist/` and compiled
+binaries work): `@fastify/jwt`, `@fastify/redis`, the Zod compilers, the external plugins (helmet,
+cors, i18n, rate limit, swagger), the app plugins (auth, di, error), then each module from the
+`routes` array with its prefix.
 
-Both entries cluster-fork via `node:cluster` when `APP_CLUSTER_WORKERS` resolves to >1. The shared bootstrap is `runWithCluster()` from `@utils` (`src/libs/utils/cluster.ts`): the primary supervises and respawns crashed children; each child runs the full Fastify/BullMQ boot independently. `APP_CLUSTER_WORKERS=0` (the default) means "auto = `os.cpus().length`"; `1` disables clustering. Dev scripts pin it to `1` so `--hot --watch` keeps working.
+### The non-obvious bits
 
-### Plugin load order (matters)
+- **Repositories are factories**, called per use; `db` is one Prisma client per process.
+- **Authorization is per route and default-open.** A protected module adds an `onRequest` hook calling
+  `await request.authenticate()`; each route then declares `onRequest: PermissionGuard([...])` or
+  `RoleGuard([...])` from `@fastify-libs`. Guards throw, so a refused request never reaches validation
+  or the handler. A route with no guard is open to every logged-in user. `superuser` bypasses both.
+- **Access vs refresh.** Access tokens carry `type: "access"` and are verified with `JWT_SECRET`;
+  refresh tokens carry `type: "refresh"`, are signed with `JWT_REFRESH_SECRET`, and their `jti` is stored
+  in Redis per user, so a refresh rotates the pair and a refresh token is never accepted as a bearer.
+- **UserInformation is cached** (`user:<id>`, 1 hour) by `Session` (`@cache`), loaded only for live
+  `ACTIVE` users. Any write that changes a user's status, roles, permissions, password or deletion
+  calls `Session.forgetUsers` / `Session.revokeSessions`; role and permission edits invalidate every
+  holder.
+- **Repositories return `null`; services throw.** Existence is `NotFoundError` (404), uniqueness is
+  `UnprocessableEntityError` (422). Datatable inputs (unknown sort/filter key or value, bad date) are
+  `BadRequestError` (400) raised by `DatatableToolkit` inside the repository, before Prisma sees them.
+- **Filters are read off the raw URL.** The Zod query schema strips `filter[<key>]`;
+  `DatatableToolkit.parseFilter(request)` reads them from `request.url`. Sort and filter allow-lists
+  are exported by each repository and reused by the route's query schema.
+- **Prisma default names, camelCase everywhere.** Tables are the model names, columns the camelCase
+  field names, responses use the same names; `UserStatus` is UPPERCASE in the database and on the wire.
+- **Env only through `@config`.** `JWT_SECRET` and `JWT_REFRESH_SECRET` are required with no default,
+  at least 32 characters, never a known placeholder, and different; startup rejects anything else.
+  `DB_POOL_MAX` / `DB_IDLE_TIMEOUT` / `DB_CONNECTION_TIMEOUT` size the `pg` pool per process.
+- **Cluster mode** (`APP_CLUSTER_MODE=true`) forks `APP_CLUSTER_WORKERS` processes (0 = per CPU) for
+  the API and, separately, the worker. A crashed child is replaced; a child that fails at startup stops
+  the primary with exit 1 instead of looping.
+- **Docs are gated** by `ENABLE_API_DOCS` (default `false`): `/docs` and `/docs/openapi.json`.
+- **Mail is queued** after the transaction that minted its token commits (`AuthMailService` in
+  `libs/mail`); the worker is a separate process (`src/bull/index.ts`). Templates are copied to
+  `dist/templates/` by the build.
+- **Soft delete** on `User` (`deletedAt`); every user read filters it. Roles and permissions are hard
+  deleted and their join rows cascade.
+- **Login is enumeration-safe**: password checked first (against a dummy hash for unknown emails),
+  one message for unknown email and wrong password; resend-verification and forgot-password always 200.
+- **Logs go to stdout and `storage/logs/app.log`** (pino multistream); mail logs never carry the
+  recipient address.
+- **Request bodies are capped at 100 KB** (`bodyLimit` in `src/app.ts`, 413 above it).
 
-`createAppInstance()` registers plugins in a specific order; the autoloader respects it:
+## Conventions
 
-1. **Infrastructure** inline — `fastifyJwt`, `fastifyRedis`, Zod validator/serializer compiler (`fastify-type-provider-zod`).
-2. **Externals** — autoloaded from `src/libs/fastify/plugins/externals/` (Helmet, CORS, rate limiting, Swagger).
-3. **App plugins** — autoloaded from `src/libs/fastify/plugins/app/` (`auth`, `authorization`, `di`, `error`, `superuser`).
-4. **Routes** — autoloaded from `src/modules/`. Each module's `index.ts` registers its routes; the directory name becomes the URL prefix.
+- Prettier: tabs, double quotes, semicolons, trailing commas, width 100. `simple-import-sort` owns
+  import order. No `any`, no floating promises, no `console.*` outside entry points and scripts.
+- Comments only where the why is non-obvious: one block above the block, no line narration.
+- Permission strings are space-separated `<group> <action>` (`"user list"`, `"role edit"`); a guard
+  string the seeder does not produce fails closed.
+- `PATCH`, never `PUT`; collections are plural kebab-case; no global prefix.
+- 422 for uniqueness conflicts; 400 for login and token failures and bad datatable input.
+- Every user-facing string is an i18n key in both `en.json` and `id.json`; run `bun run i18n:keys`.
+- Rate limit: global, 100/min per `request.ip`, counted in Redis, never keyed on client headers.
+- Always in scope: `.claude/rules/contradiction-halt.md` and `.claude/rules/documentation.md`.
 
-When adding cross-cutting behavior, decide whether it belongs in `plugins/externals/` (third-party middleware) or `plugins/app/` (project-specific behavior) — don't put it in a module.
+## Adding a new feature module
 
-### Module convention (`src/modules/<feature>/`)
+1. Add the model to `prisma/schema.prisma` (Prisma default names, no `@@map`); create a migration
+   (`make db-migrate-dev`, or offline with `prisma migrate diff`) and review the SQL.
+2. Add `src/libs/database/postgres/repositories/<entity>.repository.ts` (factory `XRepository(tx?)`,
+   reads return `null`, exported sort/filter/search allow-lists) and export it from the barrel.
+3. Add `src/modules/<feature>/{index,schema,service}.ts`: authenticate hook, a guard on every route,
+   Zod schemas, a `response` map listing every status the route can return, an `@injectable()`
+   service owning checks and transactions.
+4. Register the module in the `routes` array of `src/app.ts` with its prefix.
+5. If it needs new permissions, extend `prisma/seed/rbac.seed.ts` in the same change.
+6. Add i18n keys to both catalogues, update `.claude/rules/routes.md` and `docs/API_DOCUMENTATION.md`.
 
-A module is a triple:
+## Deeper documentation
 
-- `index.ts` — Fastify route handlers. Keep handlers thin: parse, call service, return via `ResponseToolkit`. Each route declares its `body`/`response` Zod schemas inline in the route options.
-- `schema.ts` — Zod schemas for request bodies and response shapes.
-- `service.ts` — All business logic. Decorated with `@injectable()` from tsyringe and resolved per-request via `fastify.di.resolve(ServiceClass)`.
+- `docs/README.md` - index
+- `docs/API_DOCUMENTATION.md` - envelope, auth, route map, list query
+- `docs/CONFIGURATION.md` - every env var
+- `docs/DEPLOYMENT.md` - build, Docker images, compose, migrations, cluster mode
+- `docs/ERROR_HANDLING.md` - error classes and status mapping
+- `docs/SECURITY.md` - auth, RBAC, rate limiting, headers
+- `docs/PLUGINS.md` - the Fastify plugin stack
 
-Existing modules: `auth`, `health`, `profile`, `settings`. Mirror their structure when adding new ones.
+## Skills, rules, and commands
 
-### Dependency injection
-
-The DI container is **tsyringe**, re-exported through `src/libs/fastify/di/`. Services are `@injectable()` classes; access them inside route handlers with `fastify.di.resolve(Service)` (the `di` decorator is added by `plugins/app/di.plugin.ts`). `reflect-metadata` is imported in the container module — TS config has `emitDecoratorMetadata` and `experimentalDecorators` enabled.
-
-### Data layer
-
-- **Postgres** via Prisma (`prisma/schema.prisma`, generated client at `prisma/generated/client`, imported as `@prisma-generated`). Access goes through repository factories in `src/libs/database/postgres/repositories/` (e.g. `UserRepository()`, `UserRepository(tx)` for a transaction). The shared client is exported as `db` from `@database`; multi-statement work uses `db.$transaction(async (tx: TransactionClient) => ...)` and the repository factory accepts the `tx`.
-- **ClickHouse** via `@clickhouse/client` — separate client, services, and a custom migration runner under `src/libs/database/clickhouse/`.
-- **Redis** via `@fastify/redis` (request-scoped) and `ioredis` (libs/cache, BullMQ).
-
-### Errors
-
-Throw typed errors from `src/libs/fastify/error/` (`UnprocessableEntityError`, `UnauthorizedError`, `BadRequestError`, `ConflictError`, `ForbiddenError`, `NotFoundError`, `InternalServerError`, base `HttpError`). The global error plugin (`plugins/app/error.plugin.ts`) maps them to the response envelope. Do not return raw error responses or use `reply.code(...).send({ message })` for known failure cases — throw an error class instead.
-
-### Success responses
-
-Use `ResponseToolkit.success(reply, data, message, status?)` from `@utils` for consistent envelopes. Route `response` schemas should reference the shared `SuccessResponseSchema`, `ValidationErrorResponseSchema`, `UnauthorizedResponseSchema`, `ServerErrorResponseSchema` from the module's `schema.ts` / shared schemas.
-
-### Path aliases (defined in `tsconfig.json`)
-
-Use these instead of deep relative imports. Crossing layer boundaries with `../../..` is a code smell here.
-
-```
-@/*               → src/*
-@libs/*           → src/libs/*
-@cache/*          → src/libs/cache/*
-@config/*         → src/libs/config/*
-@database/*       → src/libs/database/*
-@fastify-libs/*   → src/libs/fastify/*
-@utils/*          → src/libs/utils/*
-@types/*          → src/libs/types/*
-@bull/*           → src/bull/*
-@modules/*        → src/modules/*
-@prisma-generated → prisma/generated/client
-```
-
-Many aliases also resolve barrel-style (e.g. `@database`, `@utils`, `@config`) — prefer the barrel import when pulling several siblings.
-
-## Conventions to follow
-
-- All business logic in `service.ts`; route handlers in `index.ts` stay thin (parse body → call service → respond).
-- Validate **every** incoming body/params/query with a Zod schema declared in `schema.ts`. No ad-hoc `if (!body.x)` validation.
-- DB access only through repository functions in `src/libs/database/postgres/repositories/`. Services should not import the Prisma client directly except via `db` for `$transaction`.
-- Use the path aliases above; do not introduce relative imports that cross layers (module ↔ libs, plugin ↔ module).
-- Background work goes through BullMQ — `import { sendEmailQueue } from "@bull/queue/..."` and `queue.add(...)` rather than awaiting long work in the request lifecycle.
-- Config is centralized under `@config` (typed via `envalid`). Add new env vars to `.env.example` and the appropriate config file rather than reading `process.env` ad hoc.
+- **Skills**: `.claude/skills` is a symlink to `.agents/skills/` (vendored, indexed in
+  `.agents/skills/README.md`; `skills-lock.json` is gitignored). `fastify-best-practices` covers
+  Fastify, `prisma-client-api` covers Prisma Client.
+- **Rules**: `.claude/rules/` (27 files, start at `.claude/rules/README.md`). A rule is more specific
+  than this file and wins on conflict.
+- **Commands**: `/commit`, `/audit-flow` (read-only sweep writing `docs/audit-findings.md`).

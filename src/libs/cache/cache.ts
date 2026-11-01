@@ -1,13 +1,13 @@
-import { RedisClient } from "@database";
+import { RedisClient as RedisClientFactory } from "@database/redis/redis-client";
 import { logger } from "@utils";
-import type { RedisClient as BunRedisClient } from "bun";
+import { RedisClient } from "bun";
 
 class Cache {
-	private static redis: BunRedisClient | null = null;
+	private static redis: RedisClient | null = null;
 
-	private static getRedisClient(): BunRedisClient {
+	private static getRedisClient(): RedisClient {
 		if (!this.redis) {
-			this.redis = RedisClient.getRedisClient();
+			this.redis = RedisClientFactory.getRedisClient();
 		}
 
 		return this.redis;
@@ -42,6 +42,25 @@ class Cache {
 		}
 	}
 
+	static async deleteMany(keys: string[]): Promise<void> {
+		if (keys.length === 0) return;
+		try {
+			const client = this.getRedisClient();
+			await client.del(...keys);
+		} catch (error) {
+			logger.error(error, "Error deleting cache keys");
+		}
+	}
+
+	static async flush(): Promise<void> {
+		try {
+			const client = this.getRedisClient();
+			await client.send("FLUSHDB", []);
+		} catch (error) {
+			logger.error(error, "Error flushing Redis cache:");
+		}
+	}
+
 	static async exists(key: string): Promise<boolean> {
 		try {
 			const client = this.getRedisClient();
@@ -69,6 +88,28 @@ class Cache {
 
 	static generateKey(...args: string[]): string {
 		return args.join(":");
+	}
+
+	static async getKeys(pattern: string): Promise<string[]> {
+		try {
+			const client = this.getRedisClient();
+			const keys = await client.keys(pattern);
+			return keys;
+		} catch (error) {
+			logger.error(error, `Error getting keys with pattern ${pattern}:`);
+			return [];
+		}
+	}
+
+	static disconnect(): void {
+		try {
+			if (this.redis) {
+				this.redis.close();
+				this.redis = null;
+			}
+		} catch (error) {
+			logger.error(error, "Error disconnecting from Redis:");
+		}
 	}
 }
 

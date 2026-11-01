@@ -1,4 +1,5 @@
-import { db, UserRepository } from "@database";
+import { Session } from "@cache";
+import { UserRepository } from "@database";
 import { injectable, UnauthorizedError, UnprocessableEntityError } from "@fastify-libs";
 import { t } from "@i18n";
 import { UserInformation } from "@types";
@@ -8,52 +9,41 @@ import { Hash } from "@utils";
 export class ProfileService {
 	async updateProfile(
 		userId: string,
-		data: { name: string; email: string; remarks?: string },
+		data: { name: string; email: string },
 	): Promise<UserInformation> {
-		const emailExists = await UserRepository().emailExists(data.email, userId);
-		if (emailExists) {
+		if (await UserRepository().findLiveByEmail(data.email, userId)) {
 			throw new UnprocessableEntityError(t("auth.validationError"), [
-				{ field: "email", message: t("auth.emailAlreadyInUse") },
+				{ field: "email", message: t("settings.users.emailExists") },
 			]);
 		}
 
-		await db.user.update({
-			where: { id: userId },
-			data: {
-				name: data.name,
-				email: data.email,
-				remark: data.remarks ?? null,
-			},
-		});
+		await UserRepository().update(userId, data);
+		await Session.forgetUsers([userId]);
 
-		const userInfo = await UserRepository().findUserInformation(userId);
-		if (!userInfo) throw new UnauthorizedError(t("auth.userNotFound"));
-
-		return userInfo;
+		const information = await Session.getUserInformation(userId);
+		if (!information) {
+			throw new UnauthorizedError(t("auth.userNotFound"));
+		}
+		return information;
 	}
 
+	/** Wrong current password is a 422 on `currentPassword`; success ends every session of the user. */
 	async updatePassword(
 		userId: string,
-		data: { password: string; currentPassword: string },
+		data: { currentPassword: string; newPassword: string },
 	): Promise<void> {
-		const user = await db.user.findFirst({
-			where: { id: userId, deleted_at: null },
-		});
+		const currentHash = await UserRepository().findPasswordHash(userId);
+		if (!currentHash) {
+			throw new UnauthorizedError(t("auth.userNotFound"));
+		}
 
-		if (!user) throw new UnauthorizedError(t("auth.userNotFound"));
-
-		const isPasswordValid = await Hash.compareHash(data.currentPassword, user.password);
-
-		if (!isPasswordValid) {
+		if (!(await Hash.compareHash(data.currentPassword, currentHash))) {
 			throw new UnprocessableEntityError(t("auth.validationError"), [
 				{ field: "currentPassword", message: t("profile.currentPasswordIncorrect") },
 			]);
 		}
 
-		const hashedPassword = await Hash.generateHash(data.password);
-		await db.user.update({
-			where: { id: userId },
-			data: { password: hashedPassword },
-		});
+		await UserRepository().updatePassword(userId, await Hash.generateHash(data.newPassword));
+		await Session.revokeSessions(userId);
 	}
 }

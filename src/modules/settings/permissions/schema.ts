@@ -1,19 +1,44 @@
+import {
+	permissionFilterableFields,
+	permissionFilterExample,
+	permissionSearchColumns,
+	permissionSortableFields,
+} from "@database";
+import { buildDatatableQueryParamsSchema } from "@utils";
 import { z } from "zod";
 
-export const PermissionSchema = z.object({
-	id: z.string(),
-	name: z.string(),
-	group: z.string(),
-	created_at: z.date(),
-	updated_at: z.date(),
+export const PermissionQuerySchema = buildDatatableQueryParamsSchema({
+	sortFields: permissionSortableFields,
+	filterFields: permissionFilterableFields,
+	filterExample: permissionFilterExample,
+	searchColumns: permissionSearchColumns,
 });
 
-export const CreatePermissionSchema = z.object({
-	name: z.array(z.string()).nonempty().describe("Array of permission names"),
+export const PermissionIdParamsSchema = z.object({
+	id: z.uuid().describe("Permission ID"),
+});
+
+export const PermissionListSchema = z.object({
+	id: z.uuid().describe("Permission ID"),
+	name: z.string().describe("Permission name, '<group> <action>'"),
 	group: z.string().describe("Permission group"),
+	createdAt: z.date().describe("Created at"),
+	updatedAt: z.date().describe("Updated at"),
 });
 
-export const UpdatePermissionSchema = z.object({
-	name: z.string().min(3).max(100).describe("Permission name"),
-	group: z.string().min(3).max(100).describe("Permission group"),
+export const PermissionCreateSchema = z.object({
+	name: z
+		.array(z.string().min(1).max(255))
+		.min(1)
+		.describe("Actions to create; each is stored as '<group> <action>'"),
+	group: z.string().min(1).max(100).describe("Permission group"),
+});
+
+export const PermissionUpdateSchema = z.object({
+	name: z
+		.string()
+		.min(1)
+		.max(255)
+		.describe("Full permission name, stored verbatim, e.g. 'user list'"),
+	group: z.string().min(1).max(100).describe("Permission group"),
 });

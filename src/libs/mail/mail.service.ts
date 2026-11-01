@@ -37,8 +37,8 @@ export const EmailService = {
 			}
 		}
 
-		if (AppConfig.NODE_ENV !== "production") {
-			options.subject = `[${AppConfig.NODE_ENV.toUpperCase()}] ${options.subject}`;
+		if (AppConfig.APP_ENV !== "production") {
+			options.subject = `[${AppConfig.APP_ENV.toUpperCase()}] ${options.subject}`;
 		}
 
 		const mailOptions = {
@@ -49,16 +49,26 @@ export const EmailService = {
 			text: options.text,
 		};
 
-		logger.info(`Sending email to ${options.to} with subject "${options.subject}"`);
+		logger.info({ template: options.template }, "Sending email");
 
 		return await transporter
 			.sendMail({ ...mailOptions })
 			.then(() => {
-				logger.info(`Email sent to ${options.to} with subject "${options.subject}"`);
+				logger.info({ template: options.template }, "Email sent");
 			})
-			.catch((error) => {
-				logger.error(`Failed to send email to ${options.to}:`);
-				throw new Error("Failed to send email", { cause: error });
+			.catch((error: unknown) => {
+				/**
+				 * SMTP error messages can quote the recipient address, so only the error code
+				 * and the SMTP response code are logged or passed on.
+				 */
+				const { code, responseCode } = (error ?? {}) as {
+					code?: string;
+					responseCode?: number;
+				};
+				logger.error({ template: options.template, code, responseCode }, "Failed to send email");
+				throw new Error(
+					`Failed to send email (${code ?? "unknown"}${responseCode ? ` ${responseCode}` : ""})`,
+				);
 			});
 	},
 };
