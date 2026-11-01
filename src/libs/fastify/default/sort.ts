@@ -1,1 +1,1 @@
-export const defaultSort = "created_at";
+export const defaultSort = "createdAt";

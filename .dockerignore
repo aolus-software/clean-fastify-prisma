@@ -1,0 +1,63 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+bun.lockb
+
+# Build output
+dist
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+docs
+*.md
+
+# Testing
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+
+# Misc
+.DS_Store
+Thumbs.db
+.editorconfig
+.prettierrc
+.eslintrc
+eslint.config.mjs
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Logs
+logs
+*.log
+storage/logs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.circleci
+
+# Generated Prisma client (regenerated inside the image)
+prisma/generated

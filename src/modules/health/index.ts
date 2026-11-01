@@ -1,100 +1,78 @@
 import { db, RedisClient } from "@database";
 import { t } from "@i18n";
-import { ResponseToolkit } from "@utils";
+import {
+	createSuccessResponseSchema,
+	DateToolkit,
+	ResponseToolkit,
+	ServiceUnavailableResponseSchema,
+} from "@utils";
 import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 
-const ServiceStatusSchema = z.object({
-	status: z.enum(["healthy", "unhealthy"]),
-	responseTime: z.number(),
-	remarks: z.string().optional(),
-});
+const ServiceStateSchema = z.enum(["healthy", "unhealthy"]);
 
 export default function (fastify: FastifyInstance) {
-	fastify.withTypeProvider<ZodTypeProvider>();
+	const app = fastify.withTypeProvider<ZodTypeProvider>();
 
-	fastify.get(
+	// ======================
+	// GET: /health
+	// ======================
+	app.get(
 		"",
 		{
 			schema: {
-				tags: ["Health"],
-				summary: "Health Check",
-				description: "Checks the health status of the application and its dependencies.",
+				tags: ["General"],
+				summary: "Health check",
+				description: "Probes PostgreSQL and Redis. 503 when either probe fails.",
 				response: {
-					200: z.object({
-						status: z.number(),
-						success: z.boolean(),
-						message: z.string(),
-						data: z.object({
-							database: ServiceStatusSchema,
-							redis: ServiceStatusSchema,
+					200: createSuccessResponseSchema(
+						z.object({
+							status: z.literal("healthy"),
+							timestamp: z.string().describe("Current time in APP_TIMEZONE"),
+							services: z.object({
+								database: ServiceStateSchema,
+								redis: ServiceStateSchema,
+							}),
 						}),
-					}),
-					503: z.object({
-						status: z.number(),
-						success: z.boolean(),
-						message: z.string(),
-						data: z.object({
-							database: ServiceStatusSchema,
-							redis: ServiceStatusSchema,
-						}),
-					}),
+					),
+					503: ServiceUnavailableResponseSchema,
 				},
 			},
 		},
-		async (_request, reply) => {
-			type ServiceStatus = {
-				status: "healthy" | "unhealthy";
-				responseTime: number;
-				remarks: string;
-			};
-			const serviceStatus: { database: ServiceStatus; redis: ServiceStatus } = {
-				database: {
-					status: "healthy",
-					responseTime: 0,
-					remarks: "PostgreSQL is operational",
-				},
-				redis: {
-					status: "healthy",
-					responseTime: 0,
-					remarks: "Redis cache is operational",
-				},
-			};
+		async (request, reply) => {
+			const services: {
+				database: "healthy" | "unhealthy";
+				redis: "healthy" | "unhealthy";
+			} = { database: "healthy", redis: "healthy" };
 
 			try {
-				const start = Date.now();
 				await db.$queryRaw`SELECT 1`;
-				serviceStatus.database.responseTime = Date.now() - start;
 			} catch (error) {
-				serviceStatus.database = {
-					status: "unhealthy",
-					responseTime: 0,
-					remarks: error instanceof Error ? error.message : String(error),
-				};
+				request.log.error({ error }, "Health probe failed: database");
+				services.database = "unhealthy";
 			}
 
 			try {
-				const start = Date.now();
 				await RedisClient.getRedisClient().ping();
-				serviceStatus.redis.responseTime = Date.now() - start;
 			} catch (error) {
-				serviceStatus.redis = {
-					status: "unhealthy",
-					responseTime: 0,
-					remarks: error instanceof Error ? error.message : String(error),
-				};
+				request.log.error({ error }, "Health probe failed: redis");
+				services.redis = "unhealthy";
 			}
 
-			const allHealthy = Object.values(serviceStatus).every(
-				(service) => service.status === "healthy",
+			if (services.database !== "healthy" || services.redis !== "healthy") {
+				return ResponseToolkit.error(reply, t("health.someUnhealthy"), 503);
+			}
+
+			return ResponseToolkit.success(
+				reply,
+				{
+					status: "healthy" as const,
+					timestamp: DateToolkit.getDateTimeInformativeWithTimezone(DateToolkit.now()),
+					services,
+				},
+				t("health.allHealthy"),
 			);
-
-			if (!allHealthy) {
-				return ResponseToolkit.error(reply, t("health.someUnhealthy"), 503, serviceStatus);
-			}
-
-			return ResponseToolkit.success(reply, serviceStatus, t("health.allHealthy"));
 		},
 	);
 }

@@ -1,159 +1,176 @@
+import { PermissionGuard } from "@fastify-libs";
 import { t } from "@i18n";
 import {
 	BadRequestResponseSchema,
-	buildDatatableQueryParamsSchema,
 	createSuccessPaginationResponseSchema,
 	createSuccessResponseSchema,
 	DatatableToolkit,
 	ForbiddenResponseSchema,
+	NotFoundResponseSchema,
+	NullCreatedResponseSchema,
+	NullSuccessResponseSchema,
 	ResponseToolkit,
 	ServerErrorResponseSchema,
 	UnauthorizedResponseSchema,
+	ValidationErrorResponseSchema,
 } from "@utils";
 import { FastifyInstance } from "fastify";
-import { z } from "zod";
+import { ZodTypeProvider } from "fastify-type-provider-zod";
 
-import { CreatePermissionSchema, PermissionSchema, UpdatePermissionSchema } from "./schema";
+import {
+	PermissionCreateSchema,
+	PermissionIdParamsSchema,
+	PermissionListSchema,
+	PermissionQuerySchema,
+	PermissionUpdateSchema,
+} from "./schema";
 import { PermissionService } from "./service";
 
+const TAGS = ["Settings/Permissions"];
+const SECURITY = [{ BearerAuth: [] }];
+const ITEM_ERRORS = {
+	401: UnauthorizedResponseSchema,
+	403: ForbiddenResponseSchema,
+	404: NotFoundResponseSchema,
+	422: ValidationErrorResponseSchema,
+	500: ServerErrorResponseSchema,
+};
+
 export default function (fastify: FastifyInstance) {
-	fastify.addHook("onRequest", async (request, reply) => {
-		await request.authenticate(reply);
+	const app = fastify.withTypeProvider<ZodTypeProvider>();
+
+	app.addHook("onRequest", async (request) => {
+		await request.authenticate();
 	});
 
-	// GET /settings/permissions
-	fastify.get(
-		"/",
+	// ======================
+	// GET: /settings/permissions
+	// ======================
+	app.get(
+		"",
 		{
+			onRequest: PermissionGuard(["permission list"]),
 			schema: {
-				tags: ["Settings/Permissions"],
-				security: [{ BearerAuth: [] }],
-				querystring: buildDatatableQueryParamsSchema(
-					["id", "name", "group", "created_at", "updated_at"],
-					["name", "group", "created_at", "updated_at"],
-				),
+				tags: TAGS,
+				summary: "List permissions",
+				description: "Paginated permissions. Requires 'permission list' permission.",
+				security: SECURITY,
+				querystring: PermissionQuerySchema,
 				response: {
-					200: createSuccessPaginationResponseSchema(PermissionSchema),
+					200: createSuccessPaginationResponseSchema(PermissionListSchema),
+					400: BadRequestResponseSchema,
 					401: UnauthorizedResponseSchema,
 					403: ForbiddenResponseSchema,
+					422: ValidationErrorResponseSchema,
 					500: ServerErrorResponseSchema,
 				},
 			},
 		},
 		async (request, reply) => {
-			request.requireSuperuser(reply);
-			const queryParams = DatatableToolkit.parseFilter(request);
-			const service = fastify.di.resolve(PermissionService);
-			const data = await service.findAll(queryParams);
-
+			const data = await fastify.di
+				.resolve(PermissionService)
+				.findAll(DatatableToolkit.parseFilter(request));
 			return ResponseToolkit.success(reply, data, t("settings.permissions.fetched"));
 		},
 	);
 
-	// POST /settings/permissions
-	fastify.post(
-		"/",
+	// ======================
+	// POST: /settings/permissions
+	// ======================
+	app.post(
+		"",
 		{
+			onRequest: PermissionGuard(["permission create"]),
 			schema: {
-				tags: ["Settings/Permissions"],
-				security: [{ BearerAuth: [] }],
-				body: CreatePermissionSchema,
+				tags: TAGS,
+				summary: "Create permissions",
+				description:
+					"Create one permission per action in name, each stored as '<group> <action>'. Any name that already exists is a 422. Requires 'permission create' permission.",
+				security: SECURITY,
+				body: PermissionCreateSchema,
 				response: {
-					201: createSuccessResponseSchema(z.object({})),
+					201: NullCreatedResponseSchema,
 					401: UnauthorizedResponseSchema,
 					403: ForbiddenResponseSchema,
+					422: ValidationErrorResponseSchema,
 					500: ServerErrorResponseSchema,
 				},
 			},
 		},
 		async (request, reply) => {
-			request.requireSuperuser(reply);
-			const { name, group } = request.body as { name: string[]; group: string };
-			const service = fastify.di.resolve(PermissionService);
-			await service.create({ name, group });
-
-			return ResponseToolkit.success(reply, {}, t("settings.permissions.created"), 201);
+			await fastify.di.resolve(PermissionService).create(request.body);
+			return ResponseToolkit.success(reply, null, t("settings.permissions.created"), 201);
 		},
 	);
 
-	// GET /settings/permissions/:permissionId
-	fastify.get(
-		"/:permissionId",
+	// ======================
+	// GET: /settings/permissions/:id
+	// ======================
+	app.get(
+		"/:id",
 		{
+			onRequest: PermissionGuard(["permission detail"]),
 			schema: {
-				tags: ["Settings/Permissions"],
-				security: [{ BearerAuth: [] }],
-				params: z.object({ permissionId: z.string().describe("Permission ID") }),
+				tags: TAGS,
+				summary: "Get permission",
+				description: "Permission detail. Requires 'permission detail' permission.",
+				security: SECURITY,
+				params: PermissionIdParamsSchema,
 				response: {
-					200: createSuccessResponseSchema(PermissionSchema),
-					401: UnauthorizedResponseSchema,
-					403: ForbiddenResponseSchema,
-					500: ServerErrorResponseSchema,
+					200: createSuccessResponseSchema(PermissionListSchema),
+					...ITEM_ERRORS,
 				},
 			},
 		},
 		async (request, reply) => {
-			request.requireSuperuser(reply);
-			const { permissionId } = request.params as { permissionId: string };
-			const service = fastify.di.resolve(PermissionService);
-			const data = await service.detail(permissionId);
-
+			const data = await fastify.di.resolve(PermissionService).findOne(request.params.id);
 			return ResponseToolkit.success(reply, data, t("settings.permissions.detailFetched"));
 		},
 	);
 
-	// PUT /settings/permissions/:permissionId
-	fastify.put(
-		"/:permissionId",
+	// ======================
+	// PATCH: /settings/permissions/:id
+	// ======================
+	app.patch(
+		"/:id",
 		{
+			onRequest: PermissionGuard(["permission edit"]),
 			schema: {
-				tags: ["Settings/Permissions"],
-				security: [{ BearerAuth: [] }],
-				params: z.object({ permissionId: z.string().describe("Permission ID") }),
-				body: UpdatePermissionSchema,
-				response: {
-					200: createSuccessResponseSchema(z.object({})),
-					400: BadRequestResponseSchema,
-					401: UnauthorizedResponseSchema,
-					403: ForbiddenResponseSchema,
-					500: ServerErrorResponseSchema,
-				},
+				tags: TAGS,
+				summary: "Update permission",
+				description:
+					"name is stored verbatim, so send the full '<group> <action>' string. A name held by another permission is a 422. Requires 'permission edit' permission.",
+				security: SECURITY,
+				params: PermissionIdParamsSchema,
+				body: PermissionUpdateSchema,
+				response: { 200: NullSuccessResponseSchema, ...ITEM_ERRORS },
 			},
 		},
 		async (request, reply) => {
-			request.requireSuperuser(reply);
-			const { permissionId } = request.params as { permissionId: string };
-			const { name, group } = request.body as { name: string; group: string };
-			const service = fastify.di.resolve(PermissionService);
-			await service.update(permissionId, { name, group });
-
-			return ResponseToolkit.success(reply, {}, t("settings.permissions.updated"));
+			await fastify.di.resolve(PermissionService).update(request.params.id, request.body);
+			return ResponseToolkit.success(reply, null, t("settings.permissions.updated"));
 		},
 	);
 
-	// DELETE /settings/permissions/:permissionId
-	fastify.delete(
-		"/:permissionId",
+	// ======================
+	// DELETE: /settings/permissions/:id
+	// ======================
+	app.delete(
+		"/:id",
 		{
+			onRequest: PermissionGuard(["permission delete"]),
 			schema: {
-				tags: ["Settings/Permissions"],
-				security: [{ BearerAuth: [] }],
-				params: z.object({ permissionId: z.string().describe("Permission ID") }),
-				response: {
-					200: createSuccessResponseSchema(z.object({})),
-					401: UnauthorizedResponseSchema,
-					403: ForbiddenResponseSchema,
-					500: ServerErrorResponseSchema,
-				},
+				tags: TAGS,
+				summary: "Delete permission",
+				description: "Hard delete; role grants cascade. Requires 'permission delete' permission.",
+				security: SECURITY,
+				params: PermissionIdParamsSchema,
+				response: { 200: NullSuccessResponseSchema, ...ITEM_ERRORS },
 			},
 		},
 		async (request, reply) => {
-			request.requireSuperuser(reply);
-			const { permissionId } = request.params as { permissionId: string };
-			const service = fastify.di.resolve(PermissionService);
-			await service.delete(permissionId);
-
-			return ResponseToolkit.success(reply, {}, t("settings.permissions.deleted"));
+			await fastify.di.resolve(PermissionService).delete(request.params.id);
+			return ResponseToolkit.success(reply, null, t("settings.permissions.deleted"));
 		},
 	);
 }

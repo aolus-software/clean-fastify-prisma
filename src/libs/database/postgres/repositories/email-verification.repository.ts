@@ -1,33 +1,38 @@
-import type { Prisma } from "@prisma-generated";
+import { Prisma } from "@prisma-generated";
 
 import { db } from "../client";
 
 type TransactionClient = Prisma.TransactionClient;
 
+export type EmailVerificationToken = {
+	id: string;
+	userId: string;
+	expiresAt: Date;
+	usedAt: Date | null;
+};
+
 export function EmailVerificationRepository(tx?: TransactionClient) {
-	const dbClient = tx ?? db;
+	const dbClient = tx || db;
 
 	return {
-		async create(userId: string, token: string, expiredAt: Date): Promise<void> {
-			await dbClient.emailVerification.create({
-				data: { user_id: userId, token, expired_at: expiredAt },
-			});
-		},
-
-		async findByToken(token: string): Promise<{
-			id: string;
-			user_id: string;
-			token: string;
-			expired_at: Date;
-		} | null> {
-			return await dbClient.emailVerification.findFirst({
+		async findByToken(token: string): Promise<EmailVerificationToken | null> {
+			return dbClient.userEmailVerification.findUnique({
 				where: { token },
-				select: { id: true, user_id: true, token: true, expired_at: true },
+				select: { id: true, userId: true, expiresAt: true, usedAt: true },
 			});
 		},
 
-		async delete(id: string): Promise<void> {
-			await dbClient.emailVerification.delete({ where: { id } });
+		async create(userId: string, token: string, expiresAt: Date): Promise<void> {
+			await dbClient.userEmailVerification.create({
+				data: { userId, token, expiresAt },
+			});
+		},
+
+		async markAllUsed(userId: string): Promise<void> {
+			await dbClient.userEmailVerification.updateMany({
+				where: { userId, usedAt: null },
+				data: { usedAt: new Date() },
+			});
 		},
 	};
 }

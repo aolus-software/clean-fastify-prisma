@@ -1,153 +1,166 @@
-import type { Prisma } from "@prisma-generated";
+import { Prisma } from "@prisma-generated";
+import type { DatatableType, FilterField, PaginationResponse, RoleDetail, RoleList } from "@types";
+import { DatatableToolkit } from "@utils/fastify/datatable";
 
-import type { RoleDetail, RoleList } from "../../../types/repositories/role";
 import { db } from "../client";
 
 type TransactionClient = Prisma.TransactionClient;
 
+export const roleSortableFields = ["id", "name", "createdAt", "updatedAt"] as const;
+
+export const roleSearchColumns = ["name"] as const;
+
+export const roleFilterableFields: FilterField[] = [
+	"name",
+	{ field: "createdAt", kind: "date" },
+	{ field: "updatedAt", kind: "date" },
+];
+
+export const roleFilterExample: Record<string, string> = {
+	name: "admin",
+	createdAt: "2024-01-01,2024-12-31",
+	updatedAt: "2024-01-01,2024-12-31",
+};
+
+const roleSelect = {
+	id: true,
+	name: true,
+	createdAt: true,
+	updatedAt: true,
+} satisfies Prisma.RoleSelect;
+
 export function RoleRepository(tx?: TransactionClient) {
-	const dbClient = tx ?? db;
+	const dbClient = tx || db;
 
 	return {
-		async findAll(params: {
-			page: number;
-			limit: number;
-			sort_by: string;
-			sort_order: "asc" | "desc";
-			search?: string;
-		}): Promise<{ data: RoleList[]; total: number }> {
-			const { page, limit, sort_by, sort_order, search } = params;
-			const skip = (page - 1) * limit;
+		async findAll(query: DatatableType): Promise<PaginationResponse<RoleList>> {
+			const { page, perPage, search, sort, sortDirection, filter } = query;
 
-			const where = {
-				...(search && {
-					name: { contains: search, mode: "insensitive" as const },
-				}),
-			};
+			DatatableToolkit.assertSort(sort, roleSortableFields);
+			DatatableToolkit.assertFilter(filter, roleFilterableFields);
 
-			const orderBy: Record<string, "asc" | "desc"> = { [sort_by]: sort_order };
+			const conditions: Prisma.RoleWhereInput[] = [];
+			if (search) {
+				conditions.push({ name: { contains: search, mode: "insensitive" } });
+			}
+			if (filter?.name !== undefined) {
+				conditions.push({
+					name: { contains: filter.name.toString(), mode: "insensitive" },
+				});
+			}
+			if (filter?.createdAt !== undefined) {
+				const { from, to } = DatatableToolkit.filterDateRange(filter.createdAt, "createdAt");
+				conditions.push({ createdAt: { gte: from, lte: to } });
+			}
+			if (filter?.updatedAt !== undefined) {
+				const { from, to } = DatatableToolkit.filterDateRange(filter.updatedAt, "updatedAt");
+				conditions.push({ updatedAt: { gte: from, lte: to } });
+			}
 
-			const [roles, total] = await Promise.all([
+			const where: Prisma.RoleWhereInput = { AND: conditions };
+
+			const [data, totalCount] = await Promise.all([
 				dbClient.role.findMany({
 					where,
-					skip,
-					take: limit,
-					orderBy,
-					select: {
-						id: true,
-						name: true,
-						created_at: true,
-						updated_at: true,
-					},
+					skip: (page - 1) * perPage,
+					take: perPage,
+					orderBy: { [sort]: sortDirection },
+					select: roleSelect,
 				}),
 				dbClient.role.count({ where }),
 			]);
 
-			return { data: roles, total };
+			return { data, meta: { page, limit: perPage, totalCount } };
 		},
 
-		async findById(id: string): Promise<RoleDetail | null> {
+		async findById(id: string): Promise<RoleList | null> {
+			return dbClient.role.findUnique({ where: { id }, select: roleSelect });
+		},
+
+		async findByName(name: string, excludeId?: string): Promise<{ id: string } | null> {
+			return dbClient.role.findFirst({
+				where: { name, ...(excludeId ? { id: { not: excludeId } } : {}) },
+				select: { id: true },
+			});
+		},
+
+		async getDetail(id: string): Promise<RoleDetail | null> {
 			const role = await dbClient.role.findUnique({
 				where: { id },
 				select: {
-					id: true,
-					name: true,
-					created_at: true,
-					updated_at: true,
+					...roleSelect,
+					rolePermissions: { select: { permissionId: true } },
 				},
 			});
-
 			if (!role) return null;
 
+			const assigned = new Set(
+				role.rolePermissions.map((rolePermission) => rolePermission.permissionId),
+			);
 			const allPermissions = await dbClient.permission.findMany({
 				orderBy: [{ group: "asc" }, { name: "asc" }],
 				select: { id: true, name: true, group: true },
 			});
 
-			const assignedPermissionIds = await dbClient.rolePermission.findMany({
-				where: { role_id: id },
-				select: { permission_id: true },
-			});
-
-			const assignedIds = new Set(
-				assignedPermissionIds.map((rp: { permission_id: string }) => rp.permission_id),
-			);
-
-			const groupedPermissions = new Map<
-				string,
-				{ id: string; name: string; is_assigned: boolean }[]
-			>();
-
+			const grouped = new Map<string, { id: string; name: string; isAssigned: boolean }[]>();
 			for (const permission of allPermissions) {
-				if (!groupedPermissions.has(permission.group)) {
-					groupedPermissions.set(permission.group, []);
-				}
-				groupedPermissions.get(permission.group)!.push({
+				const names = grouped.get(permission.group) ?? [];
+				names.push({
 					id: permission.id,
 					name: permission.name,
-					is_assigned: assignedIds.has(permission.id),
+					isAssigned: assigned.has(permission.id),
 				});
+				grouped.set(permission.group, names);
 			}
-
-			const permissions = Array.from(groupedPermissions.entries()).map(([group, names]) => ({
-				group,
-				names,
-			}));
 
 			return {
 				id: role.id,
 				name: role.name,
-				created_at: role.created_at,
-				updated_at: role.updated_at,
-				permissions,
+				createdAt: role.createdAt,
+				updatedAt: role.updatedAt,
+				permissions: Array.from(grouped.entries()).map(([group, names]) => ({
+					group,
+					names,
+				})),
 			};
 		},
 
-		async create(data: { name: string; permission_ids?: string[] }): Promise<string> {
-			const { name, permission_ids } = data;
+		async countByIds(ids: string[]): Promise<number> {
+			if (ids.length === 0) return 0;
+			return dbClient.role.count({ where: { id: { in: ids } } });
+		},
 
-			const role = await dbClient.role.create({
-				data: {
-					name,
-					...(permission_ids &&
-						permission_ids.length > 0 && {
-							role_permissions: {
-								create: permission_ids.map((permission_id) => ({ permission_id })),
-							},
-						}),
-				},
+		async findIdsByPermissionId(permissionId: string): Promise<string[]> {
+			const rows = await dbClient.rolePermission.findMany({
+				where: { permissionId },
+				select: { roleId: true },
 			});
-
-			return role.id;
+			return rows.map((row) => row.roleId);
 		},
 
-		async update(id: string, data: { name?: string; permission_ids?: string[] }): Promise<void> {
-			const { name, permission_ids } = data;
+		async create(data: { name: string; permissionIds: string[] }): Promise<{ id: string }> {
+			return dbClient.role.create({
+				data: {
+					name: data.name,
+					rolePermissions: {
+						create: Array.from(new Set(data.permissionIds)).map((permissionId) => ({
+							permissionId,
+						})),
+					},
+				},
+				select: { id: true },
+			});
+		},
 
-			const executeUpdate = async (client: typeof dbClient) => {
-				if (name !== undefined) {
-					await client.role.update({ where: { id }, data: { name } });
-				}
-
-				if (permission_ids !== undefined) {
-					await client.rolePermission.deleteMany({ where: { role_id: id } });
-
-					if (permission_ids.length > 0) {
-						await client.rolePermission.createMany({
-							data: permission_ids.map((permission_id) => ({
-								role_id: id,
-								permission_id,
-							})),
-						});
-					}
-				}
-			};
-
-			if (tx) {
-				await executeUpdate(dbClient);
-			} else {
-				await db.$transaction(async (transaction: TransactionClient) => {
-					await executeUpdate(transaction);
+		async update(id: string, data: { name: string; permissionIds: string[] }): Promise<void> {
+			await dbClient.role.update({ where: { id }, data: { name: data.name } });
+			await dbClient.rolePermission.deleteMany({ where: { roleId: id } });
+			if (data.permissionIds.length > 0) {
+				await dbClient.rolePermission.createMany({
+					data: Array.from(new Set(data.permissionIds)).map((permissionId) => ({
+						roleId: id,
+						permissionId,
+					})),
 				});
 			}
 		},
@@ -156,15 +169,9 @@ export function RoleRepository(tx?: TransactionClient) {
 			await dbClient.role.delete({ where: { id } });
 		},
 
-		async nameExists(name: string, excludeId?: string): Promise<boolean> {
-			const count = await dbClient.role.count({
-				where: { name, ...(excludeId && { id: { not: excludeId } }) },
-			});
-			return count > 0;
-		},
-
 		async getSelectOptions(): Promise<{ id: string; name: string }[]> {
-			return await dbClient.role.findMany({
+			return dbClient.role.findMany({
+				where: { name: { not: "superuser" } },
 				orderBy: { name: "asc" },
 				select: { id: true, name: true },
 			});

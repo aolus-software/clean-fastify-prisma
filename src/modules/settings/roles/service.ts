@@ -1,71 +1,81 @@
-import { db, PermissionRepository, RoleRepository, type TransactionClient } from "@database";
-import { injectable, UnprocessableEntityError } from "@fastify-libs";
+import { Session } from "@cache";
+import {
+	db,
+	PermissionRepository,
+	RoleRepository,
+	type TransactionClient,
+	UserRepository,
+} from "@database";
+import { injectable, NotFoundError, UnprocessableEntityError } from "@fastify-libs";
 import { t } from "@i18n";
 import { DatatableType, PaginationResponse, RoleDetail, RoleList } from "@types";
 
+type RoleInput = { name: string; permissionIds: string[] };
+
 @injectable()
 export class RoleService {
-	async findAll(queryParam: DatatableType): Promise<PaginationResponse<RoleList>> {
-		const { data, total } = await RoleRepository().findAll({
-			page: queryParam.page,
-			limit: queryParam.limit,
-			sort_by: queryParam.sort,
-			sort_order: queryParam.sortDirection,
-			search: queryParam.search ?? undefined,
-		});
-
-		return {
-			data,
-			meta: {
-				page: queryParam.page,
-				limit: queryParam.limit,
-				totalCount: total,
-			},
-		};
+	async findAll(query: DatatableType): Promise<PaginationResponse<RoleList>> {
+		return await RoleRepository().findAll(query);
 	}
 
-	async create(data: { name: string; permission_ids?: string[] }): Promise<void> {
-		if (data.permission_ids && data.permission_ids.length > 0) {
-			const { data: permissions } = await PermissionRepository().findAll({
-				page: 1,
-				limit: data.permission_ids.length,
-				sort_by: "created_at",
-				sort_order: "desc",
-			});
-
-			const validIds = permissions.map((p) => p.id);
-			const allValid = data.permission_ids.every((id) => validIds.includes(id));
-			if (!allValid) {
-				throw new UnprocessableEntityError(t("auth.validationError"), [
-					{ field: "permission_ids", message: t("settings.roles.invalidPermissions") },
-				]);
-			}
+	async findOne(id: string): Promise<RoleDetail> {
+		const role = await RoleRepository().getDetail(id);
+		if (!role) {
+			throw new NotFoundError(t("settings.roles.notFound"));
 		}
+		return role;
+	}
+
+	async create(data: RoleInput): Promise<void> {
+		await this.assertNameAvailable(data.name);
+		await this.assertPermissionsExist(data.permissionIds);
 
 		await db.$transaction(async (tx: TransactionClient) => {
 			await RoleRepository(tx).create(data);
 		});
 	}
 
-	async detail(roleId: string): Promise<RoleDetail> {
-		const role = await RoleRepository().findById(roleId);
+	/** Every holder of the role has its cached permissions dropped. */
+	async update(id: string, data: RoleInput): Promise<void> {
+		await this.findExisting(id);
+		await this.assertNameAvailable(data.name, id);
+		await this.assertPermissionsExist(data.permissionIds);
+
+		await db.$transaction(async (tx: TransactionClient) => {
+			await RoleRepository(tx).update(id, data);
+		});
+		await Session.forgetUsers(await UserRepository().findIdsByRoleIds([id]));
+	}
+
+	async delete(id: string): Promise<void> {
+		await this.findExisting(id);
+		const holders = await UserRepository().findIdsByRoleIds([id]);
+		await RoleRepository().delete(id);
+		await Session.forgetUsers(holders);
+	}
+
+	private async findExisting(id: string): Promise<RoleList> {
+		const role = await RoleRepository().findById(id);
 		if (!role) {
-			throw new UnprocessableEntityError(t("errors.notFound"), [
-				{ field: "roleId", message: t("errors.notFound") },
-			]);
+			throw new NotFoundError(t("settings.roles.notFound"));
 		}
 		return role;
 	}
 
-	async update(id: string, data: { name?: string; permission_ids?: string[] }): Promise<void> {
-		await db.$transaction(async (tx: TransactionClient) => {
-			await RoleRepository(tx).update(id, data);
-		});
+	private async assertNameAvailable(name: string, excludeId?: string): Promise<void> {
+		if (await RoleRepository().findByName(name, excludeId)) {
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "name", message: t("settings.roles.nameExists", { name }) },
+			]);
+		}
 	}
 
-	async delete(roleId: string): Promise<void> {
-		await db.$transaction(async (tx: TransactionClient) => {
-			await RoleRepository(tx).delete(roleId);
-		});
+	private async assertPermissionsExist(permissionIds: string[]): Promise<void> {
+		const unique = [...new Set(permissionIds)];
+		if ((await PermissionRepository().countByIds(unique)) !== unique.length) {
+			throw new UnprocessableEntityError(t("auth.validationError"), [
+				{ field: "permissionIds", message: t("settings.roles.invalidPermissions") },
+			]);
+		}
 	}
 }

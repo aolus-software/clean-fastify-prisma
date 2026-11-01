@@ -4,17 +4,17 @@ services:
     container_name: fastify-prisma-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: fastify_prisma
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-clean_fastify_prisma}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     ports:
       - "5432:5432"
     networks:
       - app_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -23,7 +23,7 @@ services:
     image: redis:8-alpine
     container_name: fastify-prisma-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass password123
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-password123}
     volumes:
       - redis_data:/data
     ports:
@@ -31,10 +31,47 @@ services:
     networks:
       - app_network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", 'redis-cli -a "${REDIS_PASSWORD:-password123}" ping | grep PONG']
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # App config comes from .env. Inside the compose network use service hostnames:
+  #   DATABASE_URL=postgresql://<user>:<pass>@postgres:5432/<db>
+  #   REDIS_HOST=redis, CLICKHOUSE_HOST=http://clickhouse:8123
+  # Scaling: APP_CLUSTER_MODE=true forks APP_CLUSTER_WORKERS processes per container.
+  app:
+    build:
+      context: .
+      target: release
+    container_name: fastify-prisma-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT:-3000}:${APP_PORT:-3000}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  worker:
+    build:
+      context: .
+      target: release
+    container_name: fastify-prisma-worker
+    restart: unless-stopped
+    command: ["dist/worker.js"]
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app_network
 
 volumes:
   postgres_data:

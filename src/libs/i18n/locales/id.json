@@ -6,7 +6,6 @@
 	"common.deleted": "Data berhasil dihapus",
 	"common.retrieved": "Data berhasil diambil",
 	"common.fetched": "Data berhasil diambil",
-
 	"errors.badRequest": "Permintaan tidak valid",
 	"errors.unprocessableEntity": "Entitas tidak dapat diproses",
 	"errors.notFound": "Tidak ditemukan",
@@ -20,7 +19,6 @@
 	"errors.unsupportedMediaType": "Tipe media tidak didukung",
 	"errors.parseFailed": "Format permintaan tidak valid",
 	"errors.parseBody": "Gagal mem-parsing isi permintaan",
-
 	"validation.failed": "Validasi permintaan gagal",
 	"validation.invalid": "Data permintaan tidak valid",
 	"validation.required": "Kolom ini wajib diisi",
@@ -37,7 +35,6 @@
 	"validation.tooSmall": "Nilai terlalu kecil",
 	"validation.tooLarge": "Nilai terlalu besar",
 	"validation.patternMismatch": "Nilai tidak sesuai dengan pola yang diminta",
-
 	"auth.authRequired": "Autentikasi diperlukan",
 	"auth.invalidToken": "Token autentikasi tidak valid",
 	"auth.invalidUserId": "ID pengguna pada token tidak valid",
@@ -64,12 +61,10 @@
 	"auth.accessDeniedRole": "Akses ditolak. Peran yang diperlukan tidak ada.",
 	"auth.accessDeniedPermission": "Akses ditolak. Izin yang diperlukan tidak ada.",
 	"auth.accessDeniedSuperuser": "Akses ditolak. Peran superuser diperlukan.",
-
 	"profile.retrieved": "Profil berhasil diambil",
 	"profile.updated": "Profil berhasil diperbarui",
 	"profile.passwordUpdated": "Kata sandi berhasil diperbarui",
 	"profile.currentPasswordIncorrect": "Kata sandi saat ini tidak sesuai",
-
 	"settings.users.fetched": "Daftar pengguna berhasil diambil",
 	"settings.users.created": "Pengguna berhasil dibuat",
 	"settings.users.detailFetched": "Detail pengguna berhasil diambil",
@@ -78,26 +73,34 @@
 	"settings.users.passwordChanged": "Kata sandi berhasil diubah",
 	"settings.users.emailExists": "Email sudah terdaftar",
 	"settings.users.invalidRoles": "Satu atau beberapa peran tidak valid",
-
 	"settings.roles.fetched": "Daftar peran berhasil diambil",
 	"settings.roles.created": "Peran berhasil dibuat",
 	"settings.roles.detailFetched": "Detail peran berhasil diambil",
 	"settings.roles.updated": "Peran berhasil diperbarui",
 	"settings.roles.deleted": "Peran berhasil dihapus",
 	"settings.roles.invalidPermissions": "Satu atau beberapa izin tidak valid",
-
 	"settings.permissions.fetched": "Daftar izin berhasil diambil",
 	"settings.permissions.created": "Izin berhasil dibuat",
 	"settings.permissions.detailFetched": "Detail izin berhasil diambil",
 	"settings.permissions.updated": "Izin berhasil diperbarui",
 	"settings.permissions.deleted": "Izin berhasil dihapus",
-
 	"settings.select.permissionsFetched": "Opsi pilihan izin berhasil diambil",
 	"settings.select.rolesFetched": "Opsi pilihan peran berhasil diambil",
-
+	"settings.users.notFound": "Pengguna tidak ditemukan",
+	"settings.users.verificationEmailSent": "Email verifikasi terkirim",
+	"settings.users.resetPasswordEmailSent": "Email atur ulang kata sandi terkirim",
+	"settings.roles.notFound": "Peran tidak ditemukan",
+	"settings.roles.nameExists": "Nama peran {{name}} sudah ada",
+	"settings.permissions.notFound": "Izin tidak ditemukan",
+	"settings.permissions.nameExists": "Izin sudah ada: {{name}}",
 	"health.allHealthy": "Semua layanan dalam kondisi sehat",
 	"health.someUnhealthy": "Satu atau beberapa layanan tidak sehat",
-
+	"health.alive": "Layanan aktif",
 	"mail.subject.verification": "Verifikasi Email",
-	"mail.subject.resetPassword": "Reset Kata Sandi"
+	"mail.subject.resetPassword": "Reset Kata Sandi",
+	"datatable.sortNotAllowed": "Pengurutan berdasarkan {{field}} tidak diizinkan. Yang diizinkan: {{allowed}}",
+	"datatable.filterNotAllowed": "Filter berdasarkan {{field}} tidak diizinkan. Yang diizinkan: {{allowed}}",
+	"datatable.filterValueNotAllowed": "Harus salah satu dari {{allowed}}. Diterima: {{received}}",
+	"datatable.filterDateInvalid": "Diharapkan tanggal ISO, atau dua tanggal dipisah koma sebagai awal,akhir",
+	"datatable.filterIdInvalid": "Diharapkan satu atau beberapa UUID dipisah koma"
 }

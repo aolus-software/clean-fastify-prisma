@@ -1,31 +1,38 @@
 import { t } from "@i18n";
-import { UserInformation } from "@types";
-import { ResponseToolkit } from "@utils";
-import { FastifyInstance } from "fastify";
-
 import {
-	ProfileResponseSchema,
+	createSuccessResponseSchema,
+	NullSuccessResponseSchema,
+	ResponseToolkit,
 	ServerErrorResponseSchema,
-	SuccessResponseSchema,
 	UnauthorizedResponseSchema,
-	UpdatePasswordBodySchema,
-	UpdateProfileBodySchema,
+	UserInformationSchema,
 	ValidationErrorResponseSchema,
-} from "./schema";
+} from "@utils";
+import { FastifyInstance } from "fastify";
+import { ZodTypeProvider } from "fastify-type-provider-zod";
+
+import { UpdatePasswordBodySchema, UpdateProfileBodySchema } from "./schema";
 import { ProfileService } from "./service";
 
+const ProfileResponseSchema = createSuccessResponseSchema(UserInformationSchema);
+
 export default function (fastify: FastifyInstance) {
-	fastify.addHook("onRequest", async (request, reply) => {
-		await request.authenticate(reply);
+	const app = fastify.withTypeProvider<ZodTypeProvider>();
+
+	app.addHook("onRequest", async (request) => {
+		await request.authenticate();
 	});
 
-	// GET /profile
-	fastify.get(
+	// ======================
+	// GET: /profile
+	// ======================
+	app.get(
 		"",
 		{
 			schema: {
 				tags: ["Profile"],
-				description: "Get authenticated user's profile information.",
+				summary: "Get own profile",
+				description: "The caller's own identity, roles and permissions.",
 				security: [{ BearerAuth: [] }],
 				response: {
 					200: ProfileResponseSchema,
@@ -35,21 +42,21 @@ export default function (fastify: FastifyInstance) {
 			},
 		},
 		async (request, reply) => {
-			return ResponseToolkit.success<UserInformation>(
-				reply,
-				request.userInformation,
-				t("profile.retrieved"),
-			);
+			return ResponseToolkit.success(reply, request.userInformation, t("profile.retrieved"));
 		},
 	);
 
-	// PUT /profile
-	fastify.put(
+	// ======================
+	// PATCH: /profile
+	// ======================
+	app.patch(
 		"",
 		{
 			schema: {
 				tags: ["Profile"],
-				description: "Update authenticated user's profile information.",
+				summary: "Update own profile",
+				description:
+					"Update the caller's name and email. An email held by another live user is a 422.",
 				security: [{ BearerAuth: [] }],
 				body: UpdateProfileBodySchema,
 				response: {
@@ -61,30 +68,28 @@ export default function (fastify: FastifyInstance) {
 			},
 		},
 		async (request, reply) => {
-			const userId = request.userInformation.id;
-			const { name, email, remarks } = request.body as {
-				name: string;
-				email: string;
-				remarks?: string;
-			};
-			const service = fastify.di.resolve(ProfileService);
-			const updatedUser = await service.updateProfile(userId, { name, email, remarks });
-
-			return ResponseToolkit.success<UserInformation>(reply, updatedUser, t("profile.updated"));
+			const user = await fastify.di
+				.resolve(ProfileService)
+				.updateProfile(request.userInformation.id, request.body);
+			return ResponseToolkit.success(reply, user, t("profile.updated"));
 		},
 	);
 
-	// PATCH /profile/password
-	fastify.patch(
+	// ======================
+	// PATCH: /profile/password
+	// ======================
+	app.patch(
 		"/password",
 		{
 			schema: {
 				tags: ["Profile"],
-				description: "Update authenticated user's password.",
+				summary: "Change own password",
+				description:
+					"Change the caller's password after checking the current one. Ends the caller's sessions, so a new login is needed.",
 				security: [{ BearerAuth: [] }],
 				body: UpdatePasswordBodySchema,
 				response: {
-					200: SuccessResponseSchema,
+					200: NullSuccessResponseSchema,
 					401: UnauthorizedResponseSchema,
 					422: ValidationErrorResponseSchema,
 					500: ServerErrorResponseSchema,
@@ -92,15 +97,10 @@ export default function (fastify: FastifyInstance) {
 			},
 		},
 		async (request, reply) => {
-			const userId = request.userInformation.id;
-			const { currentPassword, password } = request.body as {
-				currentPassword: string;
-				password: string;
-			};
-			const service = fastify.di.resolve(ProfileService);
-			await service.updatePassword(userId, { currentPassword, password });
-
-			return ResponseToolkit.success(reply, {}, t("profile.passwordUpdated"));
+			await fastify.di
+				.resolve(ProfileService)
+				.updatePassword(request.userInformation.id, request.body);
+			return ResponseToolkit.success(reply, null, t("profile.passwordUpdated"));
 		},
 	);
 }

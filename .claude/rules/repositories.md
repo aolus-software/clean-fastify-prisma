@@ -1,95 +1,83 @@
 # Rule: Repositories (`src/libs/database/postgres/repositories/*.repository.ts`)
 
-Repositories are the **only** layer that talks to Prisma directly. Services consume them via the factory; route handlers never `import { db }` for queries.
+Repositories are the **only** layer that queries Prisma for application data. Services call them;
+route handlers never import `db` (the health probe is the exception).
 
 ## Shape — factory function over Prisma
 
-A repository in this repo is a **factory function** that returns an object of query methods, closing over a Prisma client (or a transaction). It is **not** a class and **not** `@injectable()`:
-
 ```ts
-import type { Prisma } from "@prisma-generated";
-
-import { db } from "../client";
-
 type TransactionClient = Prisma.TransactionClient;
 
-export function UserRepository(tx?: TransactionClient) {
-	const dbClient = tx ?? db;
+export function RoleRepository(tx?: TransactionClient) {
+	const dbClient = tx || db;
 
 	return {
-		async findByEmail(email: string): Promise<UserForAuth | null> {
-			const user = await dbClient.user.findFirst({
-				where: { email, deleted_at: null },
-				select: {
-					/* ... */
-				},
-			});
-			if (!user) return null;
-			return user;
-		},
-
-		async create(data: UserCreate): Promise<string> {
-			const created = await dbClient.user.create({ data, select: { id: true } });
-			return created.id;
+		async findById(id: string): Promise<RoleList | null> {
+			return dbClient.role.findUnique({ where: { id }, select: roleSelect });
 		},
 	};
 }
 ```
 
-Call sites always invoke the factory:
+- A factory, not a class and not `@injectable()`. `tx || db` lives in one place, and every method
+  picks up the right client: `RoleRepository()` outside a transaction, `RoleRepository(tx)` inside.
+- A read inside a transaction uses `Repository(tx)` too, or it will not see the transaction's writes.
+- Export from `repositories/index.ts`; consumers import from `@database`.
+- Use `select` and return a DTO from `@types`, never a full Prisma row (a password hash must not leave
+  through an over-wide select).
+
+## Reads return `null`, they do not throw
+
+A miss resolves to `null`; the service decides whether that is a 404. A repository never throws
+`NotFoundError` or `UnprocessableEntityError`, never checks uniqueness before a write, and never
+imports `@i18n` for a business rule. Lookups the services rely on:
+
+| Method | For |
+| --- | --- |
+| `findById(id)` | existence before update/delete |
+| `findByName(name, excludeId?)` | role / permission uniqueness |
+| `findLiveByEmail(email, excludeId?)` | user uniqueness among live users |
+| `findExistingByNames(names)` | permission batch create |
+| `countByIds(ids)` | verifying `roleIds` / `permissionIds` |
+| `getDetail(id)` | the detail DTO, `null` when absent |
+| `findIdsByRoleIds(roleIds)`, `RoleRepository().findIdsByPermissionId(id)` | cache invalidation of holders |
+
+## Soft delete
+
+Every `User` read filters `deletedAt: null`; `softDelete` stamps `deletedAt`.
+`findUserInformation(id)` additionally requires `status: UserStatus.ACTIVE` — any other user resolves
+to `null`, which the auth plugin answers with 401.
+
+## Datatable reads
+
+Each list repository declares and **exports** at module scope:
 
 ```ts
-// non-transactional
-await UserRepository().findByEmail(email);
-
-// inside a transaction — pass tx into the factory
-await db.$transaction(async (tx: TransactionClient) => {
-	const userId = await UserRepository(tx).create({ ... });
-	await EmailVerificationRepository(tx).create(userId, token, lifetime);
-});
+export const roleSortableFields = ["id", "name", "createdAt", "updatedAt"] as const;
+export const roleSearchColumns = ["name"] as const;
+export const roleFilterableFields: FilterField[] = ["name", { field: "createdAt", kind: "date" }, { field: "updatedAt", kind: "date" }];
+export const roleFilterExample: Record<string, string> = { name: "admin", createdAt: "2024-01-01,2024-12-31", updatedAt: "2024-01-01,2024-12-31" };
 ```
 
-The factory pattern is deliberate: `tx ?? db` lives in **one** place per repository, and every method automatically picks up the right client without the caller threading `tx` through individual method arguments.
+`findAll` calls `DatatableToolkit.assertSort(sort, <entity>SortableFields)` (unknown key → 400; the
+query schema already 422s it) and `DatatableToolkit.assertFilter(filter, <entity>FilterableFields)`
+(unknown key or out-of-range enum value → 400) **before** building `orderBy`, so a raw client string
+never reaches Prisma. The route's query schema is built from the same exports, so docs and enforcement
+cannot drift ([validation.md](./validation.md)).
 
-## Transaction support
+- **Sort keys are the camelCase field names**, in the vocabulary of `defaultSort = "createdAt"`.
+- **Every filter clause is pushed onto one `conditions` array and combined with `AND`.**
+- **Comma semantics per kind:** enum → `in` the split values; `kind: "id"` →
+  `DatatableToolkit.filterIds` (UUIDs, `in`); `kind: "date"` → `DatatableToolkit.filterDateRange`
+  giving inclusive `gte`/`lte` (a single date = that whole day in `APP_TIMEZONE`, `start,end` = range,
+  anything unparseable = 400); plain text → `contains`, `mode: "insensitive"`, comma literal.
+- **Search** is `contains` / `insensitive` over the exported search columns; the `status` enum is
+  matched by the UPPERCASE values that contain the term.
+- **Counts**: `count({ where })` in `Promise.all` with the page query.
+- **Output** is `{ data, meta: { page, limit: perPage, totalCount } }`.
 
-Multi-step mutations open a transaction in the service:
+## Don't
 
-```ts
-await db.$transaction(async (tx: TransactionClient) => {
-	await UserRepository(tx).create(...);
-	await RoleRepository(tx).attach(...);
-});
-```
-
-`TransactionClient` is re-exported from `@database` (`export { db, type TransactionClient } from "./client"`). Always type the `tx` parameter as `TransactionClient` — Prisma's interactive transaction client has a slightly narrower surface than the top-level `db`, and TypeScript will flag stray top-level methods (e.g. `$transaction` nesting) at compile time.
-
-A read inside a transaction must also use `Repository(tx)`, not `Repository()` — otherwise Prisma may not see uncommitted writes from earlier in the same transaction.
-
-## Queries
-
-- Use Prisma's typed query API (`dbClient.user.findFirst`, `findMany`, `count`, `create`, `update`, `delete`). Use `select` to project only the columns the caller needs — don't return whole rows when a DTO suffices.
-- **Soft delete**: every table that has a `deleted_at` column gets `deleted_at: null` added to the `where` of every read. Don't forget this — leaking soft-deleted rows is a real defect, not a stylistic one. Check `prisma/schema.prisma` to confirm which tables are soft-delete.
-- **Datatable reads**: accept `{ page, limit, sort_by, sort_order, search }` (and any feature-specific filters) as a typed `params` object. Run the paged `findMany` and the `count` inside `Promise.all([...])` so the round-trip is one server hop. Return `{ data: <DTO>[], total: number }` and let the service wrap that into the pagination response envelope.
-- **Whitelist sortable columns**: if `sort_by` is user-supplied, validate it against an allow-list inside the repository (or accept a typed union). Never feed raw `queryParam.sort_by` into Prisma's `orderBy` — that's a sort-injection vector.
-- **DTO shapes** (`UserForAuth`, `UserInformation`, `UserList`, `UserDetail`, etc.) live alongside the entity-specific types in `src/libs/types/repositories/<entity>.ts` and are re-exported via `@types`. Define a new DTO there if a new shape is needed — don't return Prisma's generated row type to consumers (it's wider than you need and leaks schema details).
-
-## What repositories should NOT do
-
-- No business-rule branching that throws `UnprocessableEntityError`, `BadRequestError`, `ConflictError`, or `ForbiddenError`. Repositories may throw `NotFoundError` when a row is genuinely missing and the caller has nothing useful to do about it; everything else (duplicate email, weak password, status conflicts, permission denials) belongs in the service.
-- No cache reads/writes. Caching is the service's job (or `auth.plugin.ts` for the user-information cache).
-- No password hashing, JWT signing, mail sending, or queue dispatch. Repositories only own SQL.
-- No cross-table orchestration that requires a transaction the caller didn't supply — if you need a transaction, accept `tx` via the factory and let the caller open it with `db.$transaction(...)`.
-- No interaction with BullMQ queues, Redis, or external HTTP. Those belong in services.
-- No `@injectable()` decorator. Repositories are factory functions; they don't go through tsyringe. See [`di.md`](./di.md).
-
-## File layout
-
-- One repository per file: `<entity>.repository.ts` under `src/libs/database/postgres/repositories/`.
-- Re-export from `src/libs/database/postgres/repositories/index.ts`. The postgres barrel (`src/libs/database/postgres/index.ts`) re-exports both `db` / `TransactionClient` and the repositories. The top-level `@database` barrel re-exports the postgres bundle plus the ClickHouse and Redis clients.
-- Consumers import via `import { UserRepository, db, type TransactionClient } from "@database"`. Never reach into `@database/postgres/repositories/...` with a deep import.
-- One repository per **aggregate**, not per query. New filters/joins extend an existing repo; you don't add a `user-active-roles.repository.ts` next to `user.repository.ts`.
-
-## Bridging into auth and other plugins
-
-`auth.plugin.ts` calls `UserRepository().findUserInformation(userJwt.id)` directly during JWT verification, before DI resolution can happen on a request. That's fine here because the factory is just a function — no container roundtrip needed. If you add another plugin that runs before app plugins, follow the same pattern: import the repository factory and call it.
+- No business rules, existence checks, uniqueness checks, cache, hashing, JWT, mail, or queues.
+- Don't open a transaction; accept `tx` through the factory.
+- Don't pass `orderBy: { [sort]: ... }` without `assertSort` first.

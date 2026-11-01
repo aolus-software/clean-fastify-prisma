@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [main, develop]
 
+# prisma.config.ts reads DATABASE_URL, so every Prisma CLI call (generate included) needs it set.
+# Nothing here boots the app, so JWT secrets are not required.
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clean_fastify_prisma_test
 
@@ -32,7 +34,7 @@ jobs:
         run: bun run lint
 
       - name: Check formatting
-        run: bunx --bun prettier --check .
+        run: bun run format:check
 
   type-check:
     name: Type Check
@@ -61,7 +63,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -85,11 +87,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate Prisma schema
+        run: bunx --bun prisma validate
+
       - name: Check Prisma schema is formatted
         run: |
           bunx --bun prisma format
           if [ -n "$(git status --porcelain prisma/schema.prisma)" ]; then
-            echo "Error: prisma/schema.prisma is not formatted. Run 'bunx prisma format' and commit."
+            echo "Error: prisma/schema.prisma is not formatted. Run 'bunx --bun prisma format' and commit."
             git diff prisma/schema.prisma
             exit 1
           fi
@@ -98,7 +103,7 @@ jobs:
         run: bun run db:generate
 
       - name: Apply migrations
-        run: bun run db:migrate:deploy
+        run: bun run db:migrate
 
   build:
     name: Build

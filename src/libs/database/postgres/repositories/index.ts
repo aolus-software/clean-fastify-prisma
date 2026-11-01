@@ -1,5 +1,5 @@
-export { EmailVerificationRepository } from "./email-verification.repository";
-export { ForgotPasswordRepository } from "./forgot-password.repository";
-export { PermissionRepository } from "./permission.repository";
-export { RoleRepository } from "./role.repository";
-export { UserRepository } from "./user.repository";
+export * from "./email-verification.repository";
+export * from "./password-reset.repository";
+export * from "./permission.repository";
+export * from "./role.repository";
+export * from "./user.repository";

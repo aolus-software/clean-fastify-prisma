@@ -6,7 +6,6 @@
 	"common.deleted": "Resource deleted successfully",
 	"common.retrieved": "Data retrieved successfully",
 	"common.fetched": "Data fetched successfully",
-
 	"errors.badRequest": "Bad Request",
 	"errors.unprocessableEntity": "Unprocessable Entity",
 	"errors.notFound": "Not Found",
@@ -20,7 +19,6 @@
 	"errors.unsupportedMediaType": "Unsupported media type",
 	"errors.parseFailed": "Invalid request format",
 	"errors.parseBody": "Failed to parse request body",
-
 	"validation.failed": "Request validation failed",
 	"validation.invalid": "Invalid request data",
 	"validation.required": "This field is required",
@@ -37,7 +35,6 @@
 	"validation.tooSmall": "Value is too small",
 	"validation.tooLarge": "Value is too large",
 	"validation.patternMismatch": "Value does not match the required pattern",
-
 	"auth.authRequired": "Authentication required",
 	"auth.invalidToken": "Invalid authentication token",
 	"auth.invalidUserId": "Invalid user ID in token",
@@ -64,12 +61,10 @@
 	"auth.accessDeniedRole": "Access denied. Required role(s) missing.",
 	"auth.accessDeniedPermission": "Access denied. Required permission(s) missing.",
 	"auth.accessDeniedSuperuser": "Access denied. Superuser role required.",
-
 	"profile.retrieved": "Profile retrieved successfully",
 	"profile.updated": "Profile updated successfully",
 	"profile.passwordUpdated": "Password updated successfully",
 	"profile.currentPasswordIncorrect": "Current password is incorrect",
-
 	"settings.users.fetched": "Users fetched",
 	"settings.users.created": "User created",
 	"settings.users.detailFetched": "User detail fetched",
@@ -78,26 +73,34 @@
 	"settings.users.passwordChanged": "Password changed",
 	"settings.users.emailExists": "Email already exists",
 	"settings.users.invalidRoles": "One or more roles are invalid",
-
 	"settings.roles.fetched": "Roles fetched",
 	"settings.roles.created": "Role created",
 	"settings.roles.detailFetched": "Role detail fetched",
 	"settings.roles.updated": "Role updated",
 	"settings.roles.deleted": "Role deleted",
 	"settings.roles.invalidPermissions": "One or more permissions are invalid",
-
 	"settings.permissions.fetched": "Permissions fetched",
 	"settings.permissions.created": "Permission created",
 	"settings.permissions.detailFetched": "Permission detail fetched",
 	"settings.permissions.updated": "Permission updated",
 	"settings.permissions.deleted": "Permission deleted",
-
 	"settings.select.permissionsFetched": "Permission select options fetched",
 	"settings.select.rolesFetched": "Role select options fetched",
-
+	"settings.users.notFound": "User not found",
+	"settings.users.verificationEmailSent": "Verification email sent",
+	"settings.users.resetPasswordEmailSent": "Reset password email sent",
+	"settings.roles.notFound": "Role not found",
+	"settings.roles.nameExists": "The role name {{name}} already exists",
+	"settings.permissions.notFound": "Permission not found",
+	"settings.permissions.nameExists": "Permission already exists: {{name}}",
 	"health.allHealthy": "All services are healthy",
 	"health.someUnhealthy": "One or more services are unhealthy",
-
+	"health.alive": "Service is alive",
 	"mail.subject.verification": "Email verification",
-	"mail.subject.resetPassword": "Reset Password"
+	"mail.subject.resetPassword": "Reset Password",
+	"datatable.sortNotAllowed": "Sorting by {{field}} is not allowed. Allowed: {{allowed}}",
+	"datatable.filterNotAllowed": "Filtering by {{field}} is not allowed. Allowed: {{allowed}}",
+	"datatable.filterValueNotAllowed": "Must be one of {{allowed}}. Received: {{received}}",
+	"datatable.filterDateInvalid": "Expected an ISO date, or two comma-separated dates as start,end",
+	"datatable.filterIdInvalid": "Expected one or more comma-separated UUIDs"
 }

@@ -1,42 +1,39 @@
-import { type TransactionClient } from "../../src/libs/database/postgres/client";
-import { db } from "../../src/libs/database/postgres/client";
-import { Hash } from "../../src/libs/utils/security/hash";
+import { db } from "@database/postgres/client";
+import { UserStatus } from "@prisma-generated";
+import { Hash } from "@utils";
 
-export const UserSeeder = async () => {
-	await db.$transaction(async (tx: TransactionClient) => {
-		const [superuser, admin] = await Promise.all([
-			tx.user.create({
-				data: {
-					name: "superuser",
-					email: "superuser@example.com",
-					email_verified_at: new Date(),
-					password: await Hash.generateHash("Password@123"),
-				},
-			}),
-			tx.user.create({
-				data: {
-					name: "admin",
-					email: "admin@example.com",
-					email_verified_at: new Date(),
-					password: await Hash.generateHash("Password@123"),
-				},
-			}),
-		]);
+import { SEEDED_ROLES } from "./rbac.seed";
 
-		const [superuserRole, adminRole] = await Promise.all([
-			tx.role.findFirst({ where: { name: "superuser" } }),
-			tx.role.findFirst({ where: { name: "admin" } }),
-		]);
+const SEED_PASSWORD = "S3crEtP4ssw0rd!";
 
-		await Promise.all([
-			superuserRole &&
-				tx.userRole.create({
-					data: { user_id: superuser.id, role_id: superuserRole.id },
-				}),
-			adminRole &&
-				tx.userRole.create({
-					data: { user_id: admin.id, role_id: adminRole.id },
-				}),
-		]);
-	});
+/**
+ * One verified, active account per seeded role (`<role>@example.com`). An
+ * existing live account is left untouched, so a rerun never resets a
+ * password an operator has changed.
+ */
+export const UserSeeder = async (): Promise<void> => {
+	for (const roleName of SEEDED_ROLES) {
+		const email = `${roleName}@example.com`;
+		const existing = await db.user.findFirst({
+			where: { email, deletedAt: null },
+			select: { id: true },
+		});
+		if (existing) continue;
+
+		const role = await db.role.findUniqueOrThrow({
+			where: { name: roleName },
+			select: { id: true },
+		});
+
+		await db.user.create({
+			data: {
+				name: roleName,
+				email,
+				password: await Hash.generateHash(SEED_PASSWORD),
+				status: UserStatus.ACTIVE,
+				emailVerifiedAt: new Date(),
+				userRoles: { create: { roleId: role.id } },
+			},
+		});
+	}
 };
