@@ -9,7 +9,7 @@ modules, the worker and the seed reuse them.
 
 | Bucket | Alias | Belongs here |
 | --- | --- | --- |
-| `libs/cache/` | `@cache` | `Cache` (`get`/`set`/`delete`/`deleteMany`), `Session` (`getUserInformation`, `forgetUsers`, `revokeSessions`), key builders `UserInformationCacheKey`, `RefreshTokenCacheKey`, `UserInformationCacheTtl` |
+| `libs/cache/` | `@cache` | `Cache` (`get`/`set`/`delete`/`deleteMany`), `Session` (`getUserInformation`, `forgetUsers`, `revokeSessions`), `forgetSelectOptions`, key builders `UserInformationCacheKey`, `RefreshTokenCacheKey`, `PermissionSelectOptionsCacheKey`, `RoleSelectOptionsCacheKey`, TTLs `UserInformationCacheTtl`, `SelectOptionsCacheTtl` |
 | `libs/config/` | `@config` | `env.config.ts` (the only `process.env` reader) and `AppConfig`, `JwtConfig`, `DatabaseConfig`, `RedisConfig`, `MailConfig`, `corsConfig`, `clickhouseConfig` |
 | `libs/database/` | `@database` | `db` (Prisma client with the `pg` adapter), `TransactionClient`, `Prisma`, `UserStatus`, repository factories and their exported allow-lists, `RedisClient`, ClickHouse client |
 | `libs/fastify/default/` | `@fastify-libs` | `StrongPassword`, `paginationLength`, `defaultSort`, token-lifetime functions, upload limits |
@@ -52,7 +52,8 @@ only `src/app.ts` imports.
 `@config/<file>.config` in `src/app.ts`, `@bull/queue/<job>.queue`, `@libs/mail/mail.service`,
 `@libs/mail/auth-mail.service`, `@database/redis/redis-client` and
 `@database/postgres/repositories` inside `libs/cache/` (avoids a barrel cycle),
-`@utils/fastify/datatable` inside repositories (same reason).
+`@utils/fastify/datatable` inside repositories (same reason), `@utils/fastify/logger` inside
+`libs/database/postgres/client.ts` (same reason; the query log).
 
 ## Don't
 

@@ -1,4 +1,4 @@
-import { Session } from "@cache";
+import { forgetSelectOptions, Session } from "@cache";
 import { PermissionRepository, RoleRepository, UserRepository } from "@database";
 import { injectable, NotFoundError, UnprocessableEntityError } from "@fastify-libs";
 import { t } from "@i18n";
@@ -34,6 +34,7 @@ export class PermissionService {
 		}
 
 		await PermissionRepository().createMany(names.map((name) => ({ name, group: data.group })));
+		await forgetSelectOptions();
 	}
 
 	/** `name` is stored verbatim, so it must be the full `"<group> <action>"` string. */
@@ -47,6 +48,7 @@ export class PermissionService {
 
 		await PermissionRepository().update(id, data);
 		await Session.forgetUsers(await this.holdersOf(id));
+		await forgetSelectOptions();
 	}
 
 	async delete(id: string): Promise<void> {
@@ -54,6 +56,7 @@ export class PermissionService {
 		const holders = await this.holdersOf(id);
 		await PermissionRepository().delete(id);
 		await Session.forgetUsers(holders);
+		await forgetSelectOptions();
 	}
 
 	private async holdersOf(permissionId: string): Promise<string[]> {

@@ -191,6 +191,7 @@ that matter most:
 | `ENABLE_API_DOCS`    | Serve `/docs`                          | false             |
 | `APP_CLUSTER_MODE`   | Fork with `node:cluster`               | false             |
 | `DB_POOL_MAX`        | `pg` pool size per process             | 10                |
+| `DB_LOG_QUERIES`     | Debug-level SQL log (no parameters)    | false             |
 
 ## Testing
 

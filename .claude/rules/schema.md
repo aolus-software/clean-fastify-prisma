@@ -44,10 +44,16 @@ permission removes its grants and assignments.
 
 - `@@index([email, deletedAt, status])` on `User`.
 - `Role.name` and `Permission.name` are `@unique`.
-- `User.email` has **no** unique constraint (a soft-deleted user's email must stay reusable, and
-  Prisma cannot declare a partial index). Live-email uniqueness is the service's
-  `findLiveByEmail` check, answered with a 422. A partial unique index may be added later through a
-  hand-written SQL migration.
+- `@@index([roleId])` on `UserRole` and `@@index([permissionId])` on `RolePermission`: the composite
+  primary keys lead with `userId` / `roleId`, so lookups by the second column ("who holds this role",
+  "which roles grant this permission", and the `ON DELETE CASCADE` from `Role` / `Permission`) need
+  their own index.
+- `User_email_live_key` — a **partial unique index** on `email WHERE "deletedAt" IS NULL`, so live
+  emails are unique in the database while a soft-deleted user's email stays reusable. Prisma 7 cannot
+  declare a partial index, so it exists only in the hand-written tail of
+  `20261112023359_db_optimization/migration.sql`, with a comment naming it in `schema.prisma`.
+  `prisma migrate diff` / `migrate dev` ignore it (no drop is generated). The service's
+  `findLiveByEmail` check still runs first, so callers get a 422; the index only catches a race.
 
 ## Token tables need expiry and single use
 
@@ -71,7 +77,8 @@ permission removes its grants and assignments.
 - **Hand-write** the SQL only where Prisma would drop and recreate data, or cannot express the change
   (renames, partial indexes, data fixes). `20261031000000_sync_with_base` is hand-written: it renames
   the old snake_case tables and columns in place, uppercases the enum, and deletes outstanding
-  tokens (reset tokens had no expiry to backfill).
+  tokens (reset tokens had no expiry to backfill). `20261112023359_db_optimization` is generated
+  plus one hand-written statement (the partial unique index above).
 - Never edit a migration that has been applied. Apply with `bun run db:migrate`
   (`prisma migrate deploy`).
 - `make reset` = generate + migrate + seed. `make fresh` = `db:drop`
