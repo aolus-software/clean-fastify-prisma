@@ -69,7 +69,7 @@ writes to stdout and `storage/logs/app.log`, and request bodies are capped at 10
 | --- | --- |
 | `@utils` | `ResponseToolkit`, `createSuccessResponseSchema`, `createSuccessPaginationResponseSchema`, `NullSuccessResponseSchema`, `NullCreatedResponseSchema`, `buildDatatableQueryParamsSchema`, the error response schemas, `UserInformationSchema`, `DatatableToolkit`, `Hash`, `StrToolkit`, `DateToolkit`, `logger`, `runWithCluster` |
 | `@fastify-libs` | `PermissionGuard`, `RoleGuard`, the error classes, `StrongPassword`, `paginationLength`, `defaultSort`, token-lifetime functions, `injectable`, `container` |
-| `@cache` | `Cache`, `Session` (cached `UserInformation`, `forgetUsers`, `revokeSessions`), `UserInformationCacheKey`, `RefreshTokenCacheKey` |
+| `@cache` | `Cache`, `Session` (cached `UserInformation`, `forgetUsers`, `revokeSessions`), `forgetSelectOptions`, `UserInformationCacheKey`, `RefreshTokenCacheKey`, the select-option cache keys |
 | `@libs/mail/auth-mail.service` | `AuthMailService` (single-use tokens + auth mail) |
 | `@database` | `db`, `TransactionClient`, `UserStatus`, `Prisma`, repository factories and their allow-lists, `RedisClient` |
 | `@types` | `DatatableType`, `FilterField`, `PaginationResponse`, token payload types, per-entity DTOs |

@@ -7,6 +7,7 @@ interface IDatabaseConfig {
 		idleTimeoutMillis: number;
 		connectionTimeoutMillis: number;
 	};
+	logQueries: boolean;
 }
 
 /** `pool` is passed to the `pg` pool behind the Prisma adapter, per process (per cluster worker). */
@@ -17,4 +18,5 @@ export const DatabaseConfig: IDatabaseConfig = {
 		idleTimeoutMillis: env.DB_IDLE_TIMEOUT,
 		connectionTimeoutMillis: env.DB_CONNECTION_TIMEOUT,
 	},
+	logQueries: env.DB_LOG_QUERIES,
 };

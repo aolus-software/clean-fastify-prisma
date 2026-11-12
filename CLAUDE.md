@@ -64,7 +64,7 @@ reachable `DATABASE_URL`.
 | `@config`           | `src/libs/config`         | `env.config.ts` (envalid, the only `process.env` reader) and derived config objects                                                    |
 | `@database`         | `src/libs/database`       | `db` (Prisma + pg pool), `TransactionClient`, `UserStatus`, repository factories and their allow-lists, `RedisClient`                  |
 | `@fastify-libs`     | `src/libs/fastify`        | defaults (`StrongPassword`, `defaultSort`, token lifetimes), error classes, guards, DI re-exports                                      |
-| `@cache`            | `src/libs/cache`          | `Cache`, `Session` (cached `UserInformation`, invalidation), cache-key builders                                                        |
+| `@cache`            | `src/libs/cache`          | `Cache`, `Session` (cached `UserInformation`, invalidation), `forgetSelectOptions`, key builders                                       |
 | `@i18n`             | `src/libs/i18n`           | `t()`, catalogues, generated key union                                                                                                 |
 | `@types`            | `src/libs/types`          | DTOs, token payloads, `DatatableType`, `FilterField`                                                                                   |
 | `@utils`            | `src/libs/utils`          | `ResponseToolkit`, response/query schema builders, `DatatableToolkit`, `Hash`, `StrToolkit`, `DateToolkit`, `logger`, `runWithCluster` |
@@ -109,7 +109,13 @@ cors, i18n, rate limit, swagger), the app plugins (auth, di, error), then each m
   field names, responses use the same names; `UserStatus` is UPPERCASE in the database and on the wire.
 - **Env only through `@config`.** `JWT_SECRET` and `JWT_REFRESH_SECRET` are required with no default,
   at least 32 characters, never a known placeholder, and different; startup rejects anything else.
-  `DB_POOL_MAX` / `DB_IDLE_TIMEOUT` / `DB_CONNECTION_TIMEOUT` size the `pg` pool per process.
+  `DB_POOL_MAX` / `DB_IDLE_TIMEOUT` / `DB_CONNECTION_TIMEOUT` size the `pg` pool per process;
+  `DB_LOG_QUERIES=true` logs each Prisma query (text and duration, never parameters) at `debug`.
+- **Select options are cached** (`select_options:permissions` / `select_options:roles`, 1 hour); every
+  role or permission create, update or delete calls `forgetSelectOptions()` (`@cache`).
+- **Live emails are unique in the database too**: the partial unique index `User_email_live_key`
+  (`email WHERE "deletedAt" IS NULL`) lives only in a hand-written migration; the service's
+  `findLiveByEmail` check still answers first with a 422.
 - **Cluster mode** (`APP_CLUSTER_MODE=true`) forks `APP_CLUSTER_WORKERS` processes (0 = per CPU) for
   the API and, separately, the worker. A crashed child is replaced; a child that fails at startup stops
   the primary with exit 1 instead of looping.

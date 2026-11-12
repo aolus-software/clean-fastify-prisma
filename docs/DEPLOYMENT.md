@@ -40,7 +40,7 @@ The worker uses the `release` image with the command `dist/worker.js`.
 
 | Service    | Image / build                                    | Notes                                                                                 |
 | ---------- | ------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `postgres` | `postgres:18-alpine`                             | database from `POSTGRES_DB` (default `clean_fastify_prisma`), port 5432               |
+| `postgres` | `postgres:18-alpine`                             | database from `POSTGRES_DB` (default `clean_fastify_prisma`), port 5432, logs statements slower than `POSTGRES_SLOW_QUERY_MS` (default 100 ms) |
 | `redis`    | `redis:8-alpine`                                 | AOF on, `--requirepass ${REDIS_PASSWORD:-password123}`, port 6379                     |
 | `app`      | build target `release`                           | `env_file: .env`, publishes `${APP_PORT:-3000}`, waits for healthy postgres and redis |
 | `worker`   | build target `release`, command `dist/worker.js` | `env_file: .env`, waits for healthy redis                                             |

@@ -1,4 +1,4 @@
-import { Session } from "@cache";
+import { forgetSelectOptions, Session } from "@cache";
 import {
 	db,
 	PermissionRepository,
@@ -33,6 +33,7 @@ export class RoleService {
 		await db.$transaction(async (tx: TransactionClient) => {
 			await RoleRepository(tx).create(data);
 		});
+		await forgetSelectOptions();
 	}
 
 	/** Every holder of the role has its cached permissions dropped. */
@@ -45,6 +46,7 @@ export class RoleService {
 			await RoleRepository(tx).update(id, data);
 		});
 		await Session.forgetUsers(await UserRepository().findIdsByRoleIds([id]));
+		await forgetSelectOptions();
 	}
 
 	async delete(id: string): Promise<void> {
@@ -52,6 +54,7 @@ export class RoleService {
 		const holders = await UserRepository().findIdsByRoleIds([id]);
 		await RoleRepository().delete(id);
 		await Session.forgetUsers(holders);
+		await forgetSelectOptions();
 	}
 
 	private async findExisting(id: string): Promise<RoleList> {

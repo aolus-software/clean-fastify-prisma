@@ -135,6 +135,8 @@ export class RoleService {
 - The service owns existence (404) and uniqueness (422) checks and every transaction.
 - Any write that changes a user's status, roles, permissions, password or deletion invalidates the
   cached `UserInformation` through `Session` from `@cache` (`forgetUsers` / `revokeSessions`).
+- Every role or permission create, update or delete also calls `forgetSelectOptions()` from `@cache`
+  (the select-option lists are cached for an hour).
 - Services are resolved with `fastify.di.resolve(Service)` or `container.resolve(Service)`; never
   `new`-ed.
 

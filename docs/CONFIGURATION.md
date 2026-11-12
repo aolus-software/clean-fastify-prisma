@@ -58,15 +58,22 @@ cannot boot with a secret that is published in this repository. The lifetimes ar
 | `DB_POOL_MAX`           | num       | `10`                                                               | `pg` pool maximum behind the Prisma adapter, **per process**               |
 | `DB_IDLE_TIMEOUT`       | num       | `30000`                                                            | Idle client timeout, ms                                                    |
 | `DB_CONNECTION_TIMEOUT` | num       | `5000`                                                             | Connection timeout, ms                                                     |
+| `DB_LOG_QUERIES`        | bool      | `false`                                                            | Log every Prisma query at `debug` (statement text and duration, never parameters) |
 
 The three pool variables are passed to `PrismaPg` in `src/libs/database/postgres/client.ts`. In
 cluster mode every child opens its own pool, so the server can see up to
 `DB_POOL_MAX × workers` connections for the API plus the same again for the worker. The Prisma CLI
 reads `DATABASE_URL` from the environment through `prisma.config.ts` and fails without it.
 
+`DB_LOG_QUERIES=true` subscribes to Prisma's `query` event and writes `{ query, durationMs }` with the
+message `db query` at `debug`, so it shows only with `LOG_LEVEL=debug`. Bound parameters (password
+hashes, tokens, emails) are never logged. Leave it off outside local development.
+
 `.env.example` also carries `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. The app does not
 read them; `docker-compose.yml` uses them to provision the `postgres` container, so keep them in sync
-with `DATABASE_URL` (default database `clean_fastify_prisma`).
+with `DATABASE_URL` (default database `clean_fastify_prisma`). `POSTGRES_SLOW_QUERY_MS` (default
+`100`, compose only) sets the container's `log_min_duration_statement`: every statement slower than
+that many milliseconds lands in `docker compose logs postgres`; `-1` turns it off.
 
 ### Cluster mode
 

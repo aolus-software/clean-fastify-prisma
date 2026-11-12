@@ -60,6 +60,12 @@ changes what it contains must invalidate it, or the caller keeps old roles for u
 | role update / delete | `Session.forgetUsers(await UserRepository().findIdsByRoleIds([id]))` |
 | permission update / delete | holders via `RoleRepository().findIdsByPermissionId(id)` then `findIdsByRoleIds` |
 
+Every role or permission create, update or delete also calls `forgetSelectOptions()` (`@cache`) after
+its write: `SelectOptionService` caches both option lists (`select_options:permissions`,
+`select_options:roles`) for `SelectOptionsCacheTtl` (3600 s). A direct database write (the seeder,
+`make fresh`) does not, so those lists can lag by up to an hour until the keys expire or Redis is
+flushed.
+
 Never build a cache key inline; never write `Cache` for user state outside `Session` and the refresh
 `jti` in `AuthService`.
 
