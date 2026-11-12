@@ -29,10 +29,10 @@ model User {
   emailVerifications UserEmailVerification[]
   passwordResets     PasswordReset[]
   userRoles          UserRole[]
-
-  @@index([email, deletedAt, status])
   // "User_email_live_key": partial unique index on (email) WHERE "deletedAt" IS NULL. Prisma cannot
   // declare a partial index, so it lives only in migration 20261112023359_db_optimization.
+
+  @@index([email, deletedAt, status])
 }
 
 model Role {
